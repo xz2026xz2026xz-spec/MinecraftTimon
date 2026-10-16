@@ -19,7 +19,6 @@ public class World {
     }
     
     public World() {
-        // пустой мир — будет загружен из файла
     }
     
     private void generate(long seed) {
@@ -35,7 +34,8 @@ public class World {
                 int height = (int) h;
                 
                 for (int y = 0; y < SIZE_Y; y++) {
-                    if (y < height - 4) blocks[x][y][z] = Block.STONE;
+                    if (y == 0) blocks[x][y][z] = Block.STONE;
+                    else if (y < height - 4) blocks[x][y][z] = Block.STONE;
                     else if (y < height - 1) blocks[x][y][z] = Block.DIRT;
                     else if (y < height) blocks[x][y][z] = Block.GRASS;
                     else blocks[x][y][z] = Block.AIR;
@@ -77,10 +77,18 @@ public class World {
     
     public void setBlock(int x, int y, int z, byte type) {
         if (x < 0 || x >= SIZE_X || y < 0 || y >= SIZE_Y || z < 0 || z >= SIZE_Z) return;
+        if (y == 0) return; // bedrock — не разрушается
         blocks[x][y][z] = type;
     }
     
-    // ===== СОХРАНЕНИЕ / ЗАГРУЗКА =====
+    public boolean isInsidePlayer(int bx, int by, int bz, float px, float py, float pz) {
+        float pMinX = px - 0.3f, pMaxX = px + 0.3f;
+        float pMinZ = pz - 0.3f, pMaxZ = pz + 0.3f;
+        float pMinY = py, pMaxY = py + 1.7f;
+        return bx + 1 > pMinX && bx < pMaxX &&
+               bz + 1 > pMinZ && bz < pMaxZ &&
+               by + 1 > pMinY && by < pMaxY;
+    }
     
     public boolean saveToFile(File f, float px, float py, float pz, float yaw, float pitch) {
         try {
@@ -88,23 +96,18 @@ public class World {
             out.writeInt(SIZE_X);
             out.writeInt(SIZE_Y);
             out.writeInt(SIZE_Z);
-            
             for (int x = 0; x < SIZE_X; x++)
                 for (int y = 0; y < SIZE_Y; y++)
                     for (int z = 0; z < SIZE_Z; z++)
                         out.writeByte(blocks[x][y][z]);
-            
             out.writeFloat(px);
             out.writeFloat(py);
             out.writeFloat(pz);
             out.writeFloat(yaw);
             out.writeFloat(pitch);
-            
             out.close();
             return true;
-        } catch (Exception e) {
-            return false;
-        }
+        } catch (Exception e) { return false; }
     }
     
     public float[] loadFromFile(File f) {
@@ -113,27 +116,18 @@ public class World {
             int sx = in.readInt();
             int sy = in.readInt();
             int sz = in.readInt();
-            
-            if (sx != SIZE_X || sy != SIZE_Y || sz != SIZE_Z) {
-                in.close();
-                return null;
-            }
-            
+            if (sx != SIZE_X || sy != SIZE_Y || sz != SIZE_Z) { in.close(); return null; }
             for (int x = 0; x < SIZE_X; x++)
                 for (int y = 0; y < SIZE_Y; y++)
                     for (int z = 0; z < SIZE_Z; z++)
                         blocks[x][y][z] = in.readByte();
-            
             float px = in.readFloat();
             float py = in.readFloat();
             float pz = in.readFloat();
             float yaw = in.readFloat();
             float pitch = in.readFloat();
-            
             in.close();
             return new float[]{px, py, pz, yaw, pitch};
-        } catch (Exception e) {
-            return null;
-        }
+        } catch (Exception e) { return null; }
     }
 }

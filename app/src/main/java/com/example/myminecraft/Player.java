@@ -6,6 +6,9 @@ public class Player {
     public float pitch = 0f;
     public float vy = 0f;
     
+    public byte selectedBlock = Block.GRASS;
+    public boolean sneaking = false;
+    
     public static final float GRAVITY = -0.015f;
     public static final float JUMP = 0.20f;
     public static final float SPEED = 0.10f;
@@ -20,7 +23,12 @@ public class Player {
         this.z = z;
     }
     
+    public float getEyeHeight() { return sneaking ? 1.0f : 1.6f; }
+    public float getHeight() { return sneaking ? 1.1f : 1.7f; }
+    
     public void update(World world) {
+        float speed = sneaking ? SPEED * 0.45f : SPEED;
+        
         if (moveX != 0 || moveZ != 0) {
             float len = (float)Math.sqrt(moveX*moveX + moveZ*moveZ);
             float nx = moveX / len;
@@ -30,14 +38,13 @@ public class Player {
             float sin = (float)Math.sin(rad);
             float cos = (float)Math.cos(rad);
             
-            // forward = (sin, 0, -cos); right = (cos, 0, sin)
-            float dx = (nx * cos + nz * sin) * SPEED;
-            float dz = (nx * sin - nz * cos) * SPEED;
+            float dx = (nx * cos + nz * sin) * speed;
+            float dz = (nx * sin - nz * cos) * speed;
             
             tryMove(world, dx, dz);
         }
         
-        if (jump && isOnGround(world)) vy = JUMP;
+        if (jump && isOnGround(world) && !sneaking) vy = JUMP;
         jump = false;
         
         vy += GRAVITY;
@@ -53,7 +60,7 @@ public class Player {
                 y = newY;
             }
         } else if (vy > 0) {
-            int by = (int)Math.floor(newY + 1.7f);
+            int by = (int)Math.floor(newY + getHeight());
             if (Block.isSolid(world.getBlock((int)Math.floor(x), by, (int)Math.floor(z)))) {
                 vy = 0;
             } else {
@@ -77,7 +84,7 @@ public class Player {
         int minZ = (int)Math.floor(pz - 0.25f);
         int maxZ = (int)Math.floor(pz + 0.25f);
         int minY = (int)Math.floor(py);
-        int maxY = (int)Math.floor(py + 1.6f);
+        int maxY = (int)Math.floor(py + getHeight());
         
         for (int bx = minX; bx <= maxX; bx++)
             for (int by = minY; by <= maxY; by++)
@@ -86,8 +93,10 @@ public class Player {
         return false;
     }
     
-    private boolean isOnGround(World world) {
+    private boolean onGround(World world) {
         int by = (int)Math.floor(y - 0.05f);
         return Block.isSolid(world.getBlock((int)Math.floor(x), by, (int)Math.floor(z)));
     }
+    
+    private boolean isOnGround(World world) { return onGround(world); }
 }

@@ -16,7 +16,6 @@ public class Block {
     private static final float[] WOOD_COLOR = {0.45f, 0.3f, 0.15f};
     private static final float[] LEAVES_COLOR = {0.2f, 0.6f, 0.2f};
     
-    // face: 0=верх, 1=низ, 2=бок
     public static float[] getColor(byte type, int face) {
         switch (type) {
             case GRASS:
@@ -31,7 +30,31 @@ public class Block {
         }
     }
     
+    public static float[] getUITopColor(byte type) {
+        switch (type) {
+            case GRASS: return GRASS_TOP;
+            case DIRT: return DIRT_COLOR;
+            case STONE: return STONE_COLOR;
+            case WOOD: return WOOD_COLOR;
+            case LEAVES: return LEAVES_COLOR;
+            default: return STONE_COLOR;
+        }
+    }
+    
+    public static String getName(byte type) {
+        switch (type) {
+            case GRASS: return "Трава";
+            case DIRT: return "Земля";
+            case STONE: return "Камень";
+            case WOOD: return "Дерево";
+            case LEAVES: return "Листва";
+            default: return "?";
+        }
+    }
+    
     public static boolean isSolid(byte type) {
         return type != AIR;
     }
+    
+    public static final byte[] PLACEABLE = {GRASS, DIRT, STONE, WOOD, LEAVES};
 }

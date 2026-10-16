@@ -44,43 +44,84 @@ public class MyGLRenderer implements GLSurfaceView.Renderer {
     public Player player;
     public List<Chunk> chunks = new ArrayList<>();
     
-    private final File saveFile;
+    private final Context ctx;
+    private File saveFile;
+    public int currentWorld = 1;
+    
     private volatile boolean savePending = false;
+    private volatile int pendingSwitch = -1;
+    private volatile boolean pendingDelete = false;
     
     public MyGLRenderer(Context ctx) {
-        saveFile = new File(ctx.getFilesDir(), "world.dat");
+        this.ctx = ctx;
+        saveFile = new File(ctx.getFilesDir(), "world_" + currentWorld + ".dat");
+        loadOrGenerate(currentWorld);
+    }
+    
+    private void loadOrGenerate(int index) {
+        File f = new File(ctx.getFilesDir(), "world_" + index + ".dat");
         
-        // Пробуем загрузить мир
-        if (saveFile.exists()) {
+        if (f.exists()) {
             World w = new World();
-            float[] pos = w.loadFromFile(saveFile);
+            float[] pos = w.loadFromFile(f);
             if (pos != null) {
                 world = w;
                 player = new Player(pos[0], pos[1], pos[2]);
                 player.yaw = pos[3];
                 player.pitch = pos[4];
-            } else {
-                // Файл битый — генерируем новый
-                world = new World(12345L);
-                player = new Player(32f, 25f, 32f);
+                fixPlayerPosition();
+                return;
             }
-        } else {
-            // Первый запуск — генерируем
-            world = new World(12345L);
-            player = new Player(32f, 25f, 32f);
         }
         
-        // Проверка: не застрял ли игрок в блоках
-        while (Block.isSolid(world.getBlock(
-                (int)Math.floor(player.x),
-                (int)Math.floor(player.y),
-                (int)Math.floor(player.z))) && player.y < World.SIZE_Y) {
+        long seed = 12345L + index * 100000L;
+        world = new World(seed);
+        player = new Player(32f, 25f, 32f);
+        fixPlayerPosition();
+    }
+    
+    private void fixPlayerPosition() {
+        for (int i = 0; i < 30; i++) {
+            int px = (int)Math.floor(player.x);
+            int py = (int)Math.floor(player.y);
+            int pz = (int)Math.floor(player.z);
+            if (!Block.isSolid(world.getBlock(px, py, pz)) &&
+                !Block.isSolid(world.getBlock(px, py + 1, pz))) break;
             player.y += 1;
         }
     }
     
-    public void saveWorld() {
-        savePending = true;
+    public void requestSwitchWorld(int index) { pendingSwitch = index; }
+    public void requestDeleteCurrent() { pendingDelete = true; }
+    public void saveNow() { savePending = true; }
+    
+    private void switchWorld(int index) {
+        // Сохранить текущий
+        world.saveToFile(saveFile, player.x, player.y, player.z, player.yaw, player.pitch);
+        
+        // Сменить
+        currentWorld = index;
+        saveFile = new File(ctx.getFilesDir(), "world_" + index + ".dat");
+        loadOrGenerate(index);
+        
+        // Пересобрать чанки
+        rebuildAllChunks();
+    }
+    
+    private void rebuildAllChunks() {
+        chunks.clear();
+        int cs = 16;
+        for (int cx = 0; cx < World.SIZE_X; cx += cs) {
+            for (int cz = 0; cz < World.SIZE_Z; cz += cs) {
+                Chunk c = new Chunk(cx, 0, cz, cs, World.SIZE_Y, cs);
+                c.buildMesh(world);
+                chunks.add(c);
+            }
+        }
+    }
+    
+    public boolean worldExists(int index) {
+        return new File(ctx.getFilesDir(), "world_" + index + ".dat").exists();
     }
     
     @Override
@@ -97,14 +138,7 @@ public class MyGLRenderer implements GLSurfaceView.Renderer {
         GLES20.glAttachShader(program, fs);
         GLES20.glLinkProgram(program);
         
-        int cs = 16;
-        for (int cx = 0; cx < World.SIZE_X; cx += cs) {
-            for (int cz = 0; cz < World.SIZE_Z; cz += cs) {
-                Chunk c = new Chunk(cx, 0, cz, cs, World.SIZE_Y, cs);
-                c.buildMesh(world);
-                chunks.add(c);
-            }
-        }
+        rebuildAllChunks();
     }
     
     public void markDirty(int wx, int wy, int wz) {
@@ -120,35 +154,46 @@ public class MyGLRenderer implements GLSurfaceView.Renderer {
     
     @Override
     public void onDrawFrame(GL10 unused) {
-        GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT | GLES20.GL_DEPTH_BUFFER_BIT);
+        // Обработка переключений
+        if (pendingDelete) {
+            pendingDelete = false;
+            if (saveFile.exists()) saveFile.delete();
+            loadOrGenerate(currentWorld);
+            rebuildAllChunks();
+        }
+        if (pendingSwitch > 0) {
+            int n = pendingSwitch;
+            pendingSwitch = -1;
+            if (n != currentWorld) switchWorld(n);
+        }
         
+        GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT | GLES20.GL_DEPTH_BUFFER_BIT);
         player.update(world);
+        
+        if (player.y < -3) { player.x = 32; player.y = 25; player.z = 32; player.vy = 0; }
         
         if (savePending) {
             savePending = false;
-            final float px = player.x;
-            final float py = player.y;
-            final float pz = player.z;
-            final float yaw = player.yaw;
-            final float pitch = player.pitch;
+            final float px = player.x, py = player.y, pz = player.z;
+            final float yw = player.yaw, pt = player.pitch;
+            final File f = saveFile;
+            final World w = world;
             new Thread(new Runnable() {
-                @Override
-                public void run() {
-                    world.saveToFile(saveFile, px, py, pz, yaw, pitch);
-                }
+                @Override public void run() { w.saveToFile(f, px, py, pz, yw, pt); }
             }).start();
         }
         
         float yawRad = (float)Math.toRadians(player.yaw);
         float pitchRad = (float)Math.toRadians(player.pitch);
-        
         float cosPitch = (float)Math.cos(pitchRad);
+        float eyeY = player.y + player.getEyeHeight();
+        
         float lookX = player.x + (float)Math.sin(yawRad) * cosPitch;
-        float lookY = player.y + 1.6f + (float)Math.sin(pitchRad);
+        float lookY = eyeY + (float)Math.sin(pitchRad);
         float lookZ = player.z - (float)Math.cos(yawRad) * cosPitch;
         
         Matrix.setLookAtM(viewMatrix, 0,
-            player.x, player.y + 1.6f, player.z,
+            player.x, eyeY, player.z,
             lookX, lookY, lookZ,
             0, 1, 0);
         
@@ -163,15 +208,11 @@ public class MyGLRenderer implements GLSurfaceView.Renderer {
         
         for (Chunk chunk : chunks) {
             if (chunk.getVertexCount() == 0) continue;
-            
             GLES20.glEnableVertexAttribArray(positionHandle);
             GLES20.glVertexAttribPointer(positionHandle, 3, GLES20.GL_FLOAT, false, 0, chunk.getVertexBuffer());
-            
             GLES20.glEnableVertexAttribArray(colorHandle);
             GLES20.glVertexAttribPointer(colorHandle, 3, GLES20.GL_FLOAT, false, 0, chunk.getColorBuffer());
-            
             GLES20.glDrawArrays(GLES20.GL_TRIANGLES, 0, chunk.getVertexCount());
-            
             GLES20.glDisableVertexAttribArray(positionHandle);
             GLES20.glDisableVertexAttribArray(colorHandle);
         }
@@ -181,7 +222,7 @@ public class MyGLRenderer implements GLSurfaceView.Renderer {
     public void onSurfaceChanged(GL10 unused, int width, int height) {
         GLES20.glViewport(0, 0, width, height);
         float ratio = (float) width / height;
-        Matrix.frustumM(projectionMatrix, 0, -ratio, ratio, -1, 1, 0.1f, 200f);
+        Matrix.perspectiveM(projectionMatrix, 0, 70f, ratio, 0.05f, 300f);
     }
     
     private int loadShader(int type, String code) {
@@ -201,16 +242,14 @@ public class MyGLRenderer implements GLSurfaceView.Renderer {
         float dz = -(float)Math.cos(yawRad) * cosPitch;
         
         float px = player.x;
-        float py = player.y + 1.6f;
+        float py = player.y + player.getEyeHeight();
         float pz = player.z;
         
         for (int i = 0; i < 80; i++) {
             int bx = (int)Math.floor(px);
             int by = (int)Math.floor(py);
             int bz = (int)Math.floor(pz);
-            if (Block.isSolid(world.getBlock(bx, by, bz))) {
-                return new int[]{bx, by, bz};
-            }
+            if (Block.isSolid(world.getBlock(bx, by, bz))) return new int[]{bx, by, bz};
             px += dx * 0.1f;
             py += dy * 0.1f;
             pz += dz * 0.1f;
