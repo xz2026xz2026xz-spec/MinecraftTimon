@@ -1,17 +1,25 @@
 package com.example.myminecraft;
 
+import java.io.DataInputStream;
+import java.io.DataOutputStream;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
 import java.util.Random;
 
 public class World {
     public static final int SIZE_X = 64;
     public static final int SIZE_Z = 64;
     public static final int SIZE_Y = 32;
-    public static final int CHUNK_SIZE = 16;
     
     private final byte[][][] blocks = new byte[SIZE_X][SIZE_Y][SIZE_Z];
     
     public World(long seed) {
         generate(seed);
+    }
+    
+    public World() {
+        // пустой мир — будет загружен из файла
     }
     
     private void generate(long seed) {
@@ -70,5 +78,62 @@ public class World {
     public void setBlock(int x, int y, int z, byte type) {
         if (x < 0 || x >= SIZE_X || y < 0 || y >= SIZE_Y || z < 0 || z >= SIZE_Z) return;
         blocks[x][y][z] = type;
+    }
+    
+    // ===== СОХРАНЕНИЕ / ЗАГРУЗКА =====
+    
+    public boolean saveToFile(File f, float px, float py, float pz, float yaw, float pitch) {
+        try {
+            DataOutputStream out = new DataOutputStream(new FileOutputStream(f));
+            out.writeInt(SIZE_X);
+            out.writeInt(SIZE_Y);
+            out.writeInt(SIZE_Z);
+            
+            for (int x = 0; x < SIZE_X; x++)
+                for (int y = 0; y < SIZE_Y; y++)
+                    for (int z = 0; z < SIZE_Z; z++)
+                        out.writeByte(blocks[x][y][z]);
+            
+            out.writeFloat(px);
+            out.writeFloat(py);
+            out.writeFloat(pz);
+            out.writeFloat(yaw);
+            out.writeFloat(pitch);
+            
+            out.close();
+            return true;
+        } catch (Exception e) {
+            return false;
+        }
+    }
+    
+    public float[] loadFromFile(File f) {
+        try {
+            DataInputStream in = new DataInputStream(new FileInputStream(f));
+            int sx = in.readInt();
+            int sy = in.readInt();
+            int sz = in.readInt();
+            
+            if (sx != SIZE_X || sy != SIZE_Y || sz != SIZE_Z) {
+                in.close();
+                return null;
+            }
+            
+            for (int x = 0; x < SIZE_X; x++)
+                for (int y = 0; y < SIZE_Y; y++)
+                    for (int z = 0; z < SIZE_Z; z++)
+                        blocks[x][y][z] = in.readByte();
+            
+            float px = in.readFloat();
+            float py = in.readFloat();
+            float pz = in.readFloat();
+            float yaw = in.readFloat();
+            float pitch = in.readFloat();
+            
+            in.close();
+            return new float[]{px, py, pz, yaw, pitch};
+        } catch (Exception e) {
+            return null;
+        }
     }
 }

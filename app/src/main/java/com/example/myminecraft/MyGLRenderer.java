@@ -1,8 +1,13 @@
 package com.example.myminecraft;
 
+import android.content.Context;
 import android.opengl.GLES20;
 import android.opengl.GLSurfaceView;
 import android.opengl.Matrix;
+
+import java.io.File;
+import java.util.ArrayList;
+import java.util.List;
 
 import javax.microedition.khronos.egl.EGLConfig;
 import javax.microedition.khronos.opengles.GL10;
@@ -34,15 +39,48 @@ public class MyGLRenderer implements GLSurfaceView.Renderer {
     private final float[] mvpMatrix = new float[16];
     private final float[] projectionMatrix = new float[16];
     private final float[] viewMatrix = new float[16];
-    private final float[] tempMatrix = new float[16];
     
     public World world;
     public Player player;
-    public Chunk chunk;
-    public volatile boolean worldDirty = false;
+    public List<Chunk> chunks = new ArrayList<>();
     
-    public MyGLRenderer() {
-        player = new Player(32f, 20f, 32f);
+    private final File saveFile;
+    private volatile boolean savePending = false;
+    
+    public MyGLRenderer(Context ctx) {
+        saveFile = new File(ctx.getFilesDir(), "world.dat");
+        
+        // Пробуем загрузить мир
+        if (saveFile.exists()) {
+            World w = new World();
+            float[] pos = w.loadFromFile(saveFile);
+            if (pos != null) {
+                world = w;
+                player = new Player(pos[0], pos[1], pos[2]);
+                player.yaw = pos[3];
+                player.pitch = pos[4];
+            } else {
+                // Файл битый — генерируем новый
+                world = new World(12345L);
+                player = new Player(32f, 25f, 32f);
+            }
+        } else {
+            // Первый запуск — генерируем
+            world = new World(12345L);
+            player = new Player(32f, 25f, 32f);
+        }
+        
+        // Проверка: не застрял ли игрок в блоках
+        while (Block.isSolid(world.getBlock(
+                (int)Math.floor(player.x),
+                (int)Math.floor(player.y),
+                (int)Math.floor(player.z))) && player.y < World.SIZE_Y) {
+            player.y += 1;
+        }
+    }
+    
+    public void saveWorld() {
+        savePending = true;
     }
     
     @Override
@@ -59,9 +97,25 @@ public class MyGLRenderer implements GLSurfaceView.Renderer {
         GLES20.glAttachShader(program, fs);
         GLES20.glLinkProgram(program);
         
-        world = new World(12345L);
-        chunk = new Chunk(0, 0, 0, World.SIZE_X, World.SIZE_Y, World.SIZE_Z);
-        chunk.buildMesh(world);
+        int cs = 16;
+        for (int cx = 0; cx < World.SIZE_X; cx += cs) {
+            for (int cz = 0; cz < World.SIZE_Z; cz += cs) {
+                Chunk c = new Chunk(cx, 0, cz, cs, World.SIZE_Y, cs);
+                c.buildMesh(world);
+                chunks.add(c);
+            }
+        }
+    }
+    
+    public void markDirty(int wx, int wy, int wz) {
+        for (Chunk c : chunks) {
+            if (wx >= c.startX - 1 && wx < c.startX + c.sizeX + 1 &&
+                wy >= c.startY - 1 && wy < c.startY + c.sizeY + 1 &&
+                wz >= c.startZ - 1 && wz < c.startZ + c.sizeZ + 1) {
+                c.buildMesh(world);
+            }
+        }
+        savePending = true;
     }
     
     @Override
@@ -70,22 +124,28 @@ public class MyGLRenderer implements GLSurfaceView.Renderer {
         
         player.update(world);
         
-        if (worldDirty) {
-            worldDirty = false;
-            chunk.buildMesh(world);
+        if (savePending) {
+            savePending = false;
+            final float px = player.x;
+            final float py = player.y;
+            final float pz = player.z;
+            final float yaw = player.yaw;
+            final float pitch = player.pitch;
+            new Thread(new Runnable() {
+                @Override
+                public void run() {
+                    world.saveToFile(saveFile, px, py, pz, yaw, pitch);
+                }
+            }).start();
         }
         
-        // Проекция
-        float ratio = 1.777f;
-        Matrix.frustumM(projectionMatrix, 0, -ratio, ratio, -1, 1, 0.1f, 100);
-        
-        // Камера от игрока (от первого лица)
         float yawRad = (float)Math.toRadians(player.yaw);
         float pitchRad = (float)Math.toRadians(player.pitch);
         
-        float lookX = player.x + (float)(Math.sin(yawRad) * Math.cos(pitchRad));
+        float cosPitch = (float)Math.cos(pitchRad);
+        float lookX = player.x + (float)Math.sin(yawRad) * cosPitch;
         float lookY = player.y + 1.6f + (float)Math.sin(pitchRad);
-        float lookZ = player.z - (float)(Math.cos(yawRad) * Math.cos(pitchRad));
+        float lookZ = player.z - (float)Math.cos(yawRad) * cosPitch;
         
         Matrix.setLookAtM(viewMatrix, 0,
             player.x, player.y + 1.6f, player.z,
@@ -101,7 +161,9 @@ public class MyGLRenderer implements GLSurfaceView.Renderer {
         positionHandle = GLES20.glGetAttribLocation(program, "vPosition");
         colorHandle = GLES20.glGetAttribLocation(program, "vColor");
         
-        if (chunk.getVertexCount() > 0) {
+        for (Chunk chunk : chunks) {
+            if (chunk.getVertexCount() == 0) continue;
+            
             GLES20.glEnableVertexAttribArray(positionHandle);
             GLES20.glVertexAttribPointer(positionHandle, 3, GLES20.GL_FLOAT, false, 0, chunk.getVertexBuffer());
             
@@ -118,6 +180,8 @@ public class MyGLRenderer implements GLSurfaceView.Renderer {
     @Override
     public void onSurfaceChanged(GL10 unused, int width, int height) {
         GLES20.glViewport(0, 0, width, height);
+        float ratio = (float) width / height;
+        Matrix.frustumM(projectionMatrix, 0, -ratio, ratio, -1, 1, 0.1f, 200f);
     }
     
     private int loadShader(int type, String code) {
@@ -127,20 +191,20 @@ public class MyGLRenderer implements GLSurfaceView.Renderer {
         return s;
     }
     
-    // Raycast — найти блок под прицелом
     public int[] raycastBlock() {
         float yawRad = (float)Math.toRadians(player.yaw);
         float pitchRad = (float)Math.toRadians(player.pitch);
+        float cosPitch = (float)Math.cos(pitchRad);
         
-        float dx = (float)(Math.sin(yawRad) * Math.cos(pitchRad));
+        float dx = (float)Math.sin(yawRad) * cosPitch;
         float dy = (float)Math.sin(pitchRad);
-        float dz = -(float)(Math.cos(yawRad) * Math.cos(pitchRad));
+        float dz = -(float)Math.cos(yawRad) * cosPitch;
         
         float px = player.x;
         float py = player.y + 1.6f;
         float pz = player.z;
         
-        for (int i = 0; i < 60; i++) {
+        for (int i = 0; i < 80; i++) {
             int bx = (int)Math.floor(px);
             int by = (int)Math.floor(py);
             int bz = (int)Math.floor(pz);
