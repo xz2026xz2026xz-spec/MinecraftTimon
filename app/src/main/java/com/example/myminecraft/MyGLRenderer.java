@@ -4,9 +4,6 @@ import android.opengl.GLES20;
 import android.opengl.GLSurfaceView;
 import android.opengl.Matrix;
 
-import java.util.ArrayList;
-import java.util.List;
-
 import javax.microedition.khronos.egl.EGLConfig;
 import javax.microedition.khronos.opengles.GL10;
 
@@ -37,12 +34,16 @@ public class MyGLRenderer implements GLSurfaceView.Renderer {
     private final float[] mvpMatrix = new float[16];
     private final float[] projectionMatrix = new float[16];
     private final float[] viewMatrix = new float[16];
-    private final float[] modelMatrix = new float[16];
     private final float[] tempMatrix = new float[16];
     
-    private World world;
-    private final List<Chunk> chunks = new ArrayList<>();
-    private float angle = 0f;
+    public World world;
+    public Player player;
+    public Chunk chunk;
+    public volatile boolean worldDirty = false;
+    
+    public MyGLRenderer() {
+        player = new Player(32f, 20f, 32f);
+    }
     
     @Override
     public void onSurfaceCreated(GL10 unused, EGLConfig config) {
@@ -59,50 +60,48 @@ public class MyGLRenderer implements GLSurfaceView.Renderer {
         GLES20.glLinkProgram(program);
         
         world = new World(12345L);
-        
-        int cs = World.CHUNK_SIZE;
-        for (int cx = 0; cx < World.SIZE_X; cx += cs) {
-            for (int cz = 0; cz < World.SIZE_Z; cz += cs) {
-                Chunk c = new Chunk(cx, 0, cz,
-                        Math.min(cs, World.SIZE_X - cx),
-                        World.SIZE_Y,
-                        Math.min(cs, World.SIZE_Z - cz));
-                c.buildMesh(world);
-                chunks.add(c);
-            }
-        }
+        chunk = new Chunk(0, 0, 0, World.SIZE_X, World.SIZE_Y, World.SIZE_Z);
+        chunk.buildMesh(world);
     }
     
     @Override
     public void onDrawFrame(GL10 unused) {
         GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT | GLES20.GL_DEPTH_BUFFER_BIT);
         
-        angle += 0.3f;
+        player.update(world);
         
-        Matrix.setIdentityM(modelMatrix, 0);
-        Matrix.translateM(modelMatrix, 0, -World.SIZE_X / 2f, -World.SIZE_Y / 2f, -World.SIZE_Z / 2f);
-        Matrix.rotateM(modelMatrix, 0, 20, 1, 0, 0);
-        Matrix.rotateM(modelMatrix, 0, angle, 0, 1, 0);
+        if (worldDirty) {
+            worldDirty = false;
+            chunk.buildMesh(world);
+        }
+        
+        // Проекция
+        float ratio = 1.777f;
+        Matrix.frustumM(projectionMatrix, 0, -ratio, ratio, -1, 1, 0.1f, 100);
+        
+        // Камера от игрока (от первого лица)
+        float yawRad = (float)Math.toRadians(player.yaw);
+        float pitchRad = (float)Math.toRadians(player.pitch);
+        
+        float lookX = player.x + (float)(Math.sin(yawRad) * Math.cos(pitchRad));
+        float lookY = player.y + 1.6f + (float)Math.sin(pitchRad);
+        float lookZ = player.z - (float)(Math.cos(yawRad) * Math.cos(pitchRad));
         
         Matrix.setLookAtM(viewMatrix, 0,
-            0, 0, 70,
-            0, 0, 0,
+            player.x, player.y + 1.6f, player.z,
+            lookX, lookY, lookZ,
             0, 1, 0);
         
-        Matrix.multiplyMM(tempMatrix, 0, projectionMatrix, 0, viewMatrix, 0);
-        Matrix.multiplyMM(mvpMatrix, 0, tempMatrix, 0, modelMatrix, 0);
+        Matrix.multiplyMM(mvpMatrix, 0, projectionMatrix, 0, viewMatrix, 0);
         
         GLES20.glUseProgram(program);
-        
         mvpMatrixHandle = GLES20.glGetUniformLocation(program, "uMVPMatrix");
         GLES20.glUniformMatrix4fv(mvpMatrixHandle, 1, false, mvpMatrix, 0);
         
         positionHandle = GLES20.glGetAttribLocation(program, "vPosition");
         colorHandle = GLES20.glGetAttribLocation(program, "vColor");
         
-        for (Chunk chunk : chunks) {
-            if (chunk.getVertexCount() == 0) continue;
-            
+        if (chunk.getVertexCount() > 0) {
             GLES20.glEnableVertexAttribArray(positionHandle);
             GLES20.glVertexAttribPointer(positionHandle, 3, GLES20.GL_FLOAT, false, 0, chunk.getVertexBuffer());
             
@@ -119,8 +118,6 @@ public class MyGLRenderer implements GLSurfaceView.Renderer {
     @Override
     public void onSurfaceChanged(GL10 unused, int width, int height) {
         GLES20.glViewport(0, 0, width, height);
-        float ratio = (float) width / height;
-        Matrix.frustumM(projectionMatrix, 0, -ratio, ratio, -1, 1, 1, 250);
     }
     
     private int loadShader(int type, String code) {
@@ -128,5 +125,32 @@ public class MyGLRenderer implements GLSurfaceView.Renderer {
         GLES20.glShaderSource(s, code);
         GLES20.glCompileShader(s);
         return s;
+    }
+    
+    // Raycast — найти блок под прицелом
+    public int[] raycastBlock() {
+        float yawRad = (float)Math.toRadians(player.yaw);
+        float pitchRad = (float)Math.toRadians(player.pitch);
+        
+        float dx = (float)(Math.sin(yawRad) * Math.cos(pitchRad));
+        float dy = (float)Math.sin(pitchRad);
+        float dz = -(float)(Math.cos(yawRad) * Math.cos(pitchRad));
+        
+        float px = player.x;
+        float py = player.y + 1.6f;
+        float pz = player.z;
+        
+        for (int i = 0; i < 60; i++) {
+            int bx = (int)Math.floor(px);
+            int by = (int)Math.floor(py);
+            int bz = (int)Math.floor(pz);
+            if (Block.isSolid(world.getBlock(bx, by, bz))) {
+                return new int[]{bx, by, bz};
+            }
+            px += dx * 0.1f;
+            py += dy * 0.1f;
+            pz += dz * 0.1f;
+        }
+        return null;
     }
 }

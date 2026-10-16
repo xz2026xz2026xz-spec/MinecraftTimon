@@ -66,4 +66,9 @@ public class World {
         }
         return blocks[x][y][z];
     }
+    
+    public void setBlock(int x, int y, int z, byte type) {
+        if (x < 0 || x >= SIZE_X || y < 0 || y >= SIZE_Y || z < 0 || z >= SIZE_Z) return;
+        blocks[x][y][z] = type;
+    }
 }
