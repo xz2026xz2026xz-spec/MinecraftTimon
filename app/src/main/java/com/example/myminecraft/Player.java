@@ -6,7 +6,7 @@ public class Player {
     public float pitch = 0f;
     public float vy = 0f;
     public boolean sneaking = false;
-    public boolean thirdPerson = false; // НОВОЕ: вид от 3-го лица
+    public boolean thirdPerson = false;
     
     public static final float GRAVITY = -0.025f;
     public static final float JUMP = 0.26f;
@@ -16,9 +16,7 @@ public class Player {
     public float moveZ = 0f;
     public boolean jump = false;
     
-    public Player(float x, float y, float z) {
-        this.x = x; this.y = y; this.z = z;
-    }
+    public Player(float x, float y, float z) { this.x = x; this.y = y; this.z = z; }
     
     public float getEyeHeight() { return sneaking ? 1.0f : 1.6f; }
     public float getHeight() { return sneaking ? 1.1f : 1.7f; }
@@ -34,8 +32,10 @@ public class Player {
             float dz = (nx * sin - nz * cos) * speed;
             tryMove(world, dx, dz);
         }
+        
         if (jump && isOnGround(world) && !sneaking) vy = JUMP;
         jump = false;
+        
         vy += GRAVITY;
         if (vy < -0.4f) vy = -0.4f; 
         float newY = y + vy;
@@ -51,6 +51,7 @@ public class Player {
                 vy = 0;
             } else { y = newY; }
         } else { y = newY; }
+        
         if (y < -5) { x = 32; y = 25; z = 32; vy = 0; }
     }
     
@@ -62,9 +63,10 @@ public class Player {
     }
     
     private boolean collides(World world, float px, float py, float pz) {
-        int minX = (int)Math.floor(px - 0.3f), maxX = (int)Math.floor(px + 0.3f);
-        int minZ = (int)Math.floor(pz - 0.3f), maxZ = (int)Math.floor(pz + 0.3f);
-        int minY = (int)Math.floor(py + 0.1f), maxY = (int)Math.floor(py + getHeight() - 0.1f);
+        // Узкий хитбокс, чтобы не застревать
+        int minX = (int)Math.floor(px - 0.25f), maxX = (int)Math.floor(px + 0.25f);
+        int minZ = (int)Math.floor(pz - 0.25f), maxZ = (int)Math.floor(pz + 0.25f);
+        int minY = (int)Math.floor(py + 0.05f), maxY = (int)Math.floor(py + getHeight() - 0.05f);
         for (int bx = minX; bx <= maxX; bx++)
             for (int by = minY; by <= maxY; by++)
                 for (int bz = minZ; bz <= maxZ; bz++)

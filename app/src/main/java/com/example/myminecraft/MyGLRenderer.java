@@ -123,17 +123,14 @@ public class MyGLRenderer implements GLSurfaceView.Renderer {
         float camX = player.x, camY = player.y + player.getEyeHeight(), camZ = player.z;
         
         if (player.thirdPerson) {
-            // Камера от 3-го лица (отъезжает назад)
             float dist = 4.0f, step = 0.2f, curDist = 0;
             float stepX = -(float)Math.sin(yawRad) * cosPitch * step;
             float stepY = -(float)Math.sin(pitchRad) * step;
             float stepZ = (float)Math.cos(yawRad) * cosPitch * step;
-            
             while (curDist < dist) {
                 float nextX = camX + stepX, nextY = camY + stepY, nextZ = camZ + stepZ;
                 if (Block.isSolid(world.getBlock((int)Math.floor(nextX), (int)Math.floor(nextY), (int)Math.floor(nextZ)))) break;
-                camX = nextX; camY = nextY; camZ = nextZ;
-                curDist += step;
+                camX = nextX; camY = nextY; camZ = nextZ; curDist += step;
             }
         }
         

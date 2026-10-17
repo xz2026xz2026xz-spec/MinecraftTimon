@@ -34,6 +34,11 @@ public class MainActivity extends Activity {
     public Bitmap skinBitmap = null;
     public Paint skinPaint = new Paint(Paint.FILTER_BITMAP_FLAG);
     
+    // Настройки управления
+    public boolean leftHanded = false; 
+    public int uiSizeMode = 1; // 0=маленький, 1=средний, 2=большой
+    public float getUiScale() { return uiSizeMode == 0 ? 0.8f : (uiSizeMode == 2 ? 1.2f : 1.0f); }
+    
     @Override protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         requestWindowFeature(Window.FEATURE_NO_TITLE);
@@ -81,20 +86,27 @@ public class MainActivity extends Activity {
         int action = event.getActionMasked();
         int index = event.getActionIndex();
         int W = glView.getWidth(), H = glView.getHeight();
+        float scale = getUiScale();
         
         if (action == MotionEvent.ACTION_DOWN || action == MotionEvent.ACTION_POINTER_DOWN) {
             float x = event.getX(index), y = event.getY(index);
             if (handleUIDown(x, y, W, H)) { overlay.invalidate(); return true; }
             if (inventoryOpen || settingsOpen) return true;
             
-            if (x < W / 3 && joyPointerId == -1) {
+            // Джойстик
+            boolean isJoySide = leftHanded ? (x > W / 2) : (x < W / 2);
+            if (isJoySide && joyPointerId == -1) {
                 joyPointerId = event.getPointerId(index);
                 joyCenterX = x; joyCenterY = y; knobX = x; knobY = y;
-            } else if (inCircle(x, y, W - 250, H - 150, 60) && breakPointerId == -1) {
+            } 
+            // Кнопки (Ломать и Ставить)
+            else if (inCircle(x, y, leftHanded ? 100 : W - 100, H - 150, 60 * scale) && breakPointerId == -1) {
                 breakPointerId = event.getPointerId(index); doAction(true);
-            } else if (inCircle(x, y, W - 110, H - 280, 60) && placePointerId == -1) {
+            } else if (inCircle(x, y, leftHanded ? 100 : W - 100, H - 300, 60 * scale) && placePointerId == -1) {
                 placePointerId = event.getPointerId(index); doAction(false);
-            } else if (x > W / 3 && lookPointerId == -1) {
+            } 
+            // Камера (противоположная сторона от джойстика)
+            else if (!isJoySide && lookPointerId == -1) {
                 lookPointerId = event.getPointerId(index);
                 lastSwipeX = x; lastSwipeY = y;
             }
@@ -107,10 +119,11 @@ public class MainActivity extends Activity {
                 if (pId == joyPointerId) {
                     float dx = x - joyCenterX, dy = y - joyCenterY;
                     float dist = (float)Math.sqrt(dx*dx + dy*dy);
-                    if (dist > joyRadius) { dx = dx/dist*joyRadius; dy = dy/dist*joyRadius; }
+                    float maxDist = joyRadius * scale;
+                    if (dist > maxDist) { dx = dx/dist*maxDist; dy = dy/dist*maxDist; }
                     knobX = joyCenterX + dx; knobY = joyCenterY + dy;
-                    renderer.player.moveX = dx / joyRadius;
-                    renderer.player.moveZ = -dy / joyRadius;
+                    renderer.player.moveX = dx / maxDist;
+                    renderer.player.moveZ = -dy / maxDist;
                 } else if (pId == lookPointerId) {
                     float dx = x - lastSwipeX, dy = y - lastSwipeY;
                     renderer.player.yaw += dx * 0.4f;
@@ -125,8 +138,7 @@ public class MainActivity extends Activity {
         else if (action == MotionEvent.ACTION_UP || action == MotionEvent.ACTION_POINTER_UP) {
             int pId = event.getPointerId(index);
             if (pId == joyPointerId) {
-                joyPointerId = -1;
-                renderer.player.moveX = 0; renderer.player.moveZ = 0;
+                joyPointerId = -1; renderer.player.moveX = 0; renderer.player.moveZ = 0;
             } else if (pId == lookPointerId) lookPointerId = -1;
             else if (pId == breakPointerId) breakPointerId = -1;
             else if (pId == placePointerId) placePointerId = -1;
@@ -152,32 +164,59 @@ public class MainActivity extends Activity {
     }
     
     private boolean handleUIDown(float x, float y, int W, int H) {
+        float scale = getUiScale();
         if (inventoryOpen) {
-            if (inCircle(x, y, W - 60, 60, 45)) { inventoryOpen = false; return true; }
+            if (inCircle(x, y, W - 60, 60, 45 * scale)) { inventoryOpen = false; return true; }
             return false;
         }
         if (settingsOpen) {
-            if (inCircle(x, y, W - 60, 60, 45)) { settingsOpen = false; return true; }
-            if (x > W/2 - 200 && x < W/2 + 200 && y > H/2 - 50 && y < H/2 + 30) {
+            if (inCircle(x, y, W - 60, 60, 45 * scale)) { settingsOpen = false; return true; }
+            
+            // Выбор миров
+            int btnSize = (int)(110 * scale), gap = (int)(25 * scale);
+            int totalW = 5 * btnSize + 4 * gap;
+            int startX = (W - totalW) / 2, startY = H / 2 - 150;
+            for (int i = 0; i < 5; i++) {
+                int bx = startX + i * (btnSize + gap);
+                if (x >= bx && x <= bx + btnSize && y >= startY && y <= startY + btnSize) {
+                    if (renderer.currentWorld != i + 1) { renderer.requestSwitchWorld(i + 1); }
+                    settingsOpen = false; return true;
+                }
+            }
+            
+            // Кнопка "Режим левши"
+            if (x > W/2 - 200 && x < W/2 + 200 && y > H/2 + 50 && y < H/2 + 130) {
+                leftHanded = !leftHanded; return true;
+            }
+            // Кнопка "Размер UI"
+            if (x > W/2 - 200 && x < W/2 + 200 && y > H/2 + 150 && y < H/2 + 230) {
+                uiSizeMode = (uiSizeMode + 1) % 3; return true;
+            }
+            // Кнопка загрузки скина
+            if (x > W/2 - 200 && x < W/2 + 200 && y > H/2 + 250 && y < H/2 + 330) {
                 Intent intent = new Intent(Intent.ACTION_PICK); intent.setType("image/*");
                 startActivityForResult(intent, 100); return true;
             }
             return false;
         }
         
-        // Кнопка переключения вида (1-е / 3-е лицо)
-        if (inCircle(x, y, W - 260, 60, 45)) { renderer.player.thirdPerson = !renderer.player.thirdPerson; return true; }
-        if (inCircle(x, y, W - 160, 60, 45)) { inventoryOpen = true; return true; }
-        if (inCircle(x, y, W - 60, 60, 45)) { settingsOpen = true; return true; }
+        if (inCircle(x, y, W - 260 * scale, 60, 45 * scale)) { renderer.player.thirdPerson = !renderer.player.thirdPerson; return true; }
+        if (inCircle(x, y, W - 160 * scale, 60, 45 * scale)) { inventoryOpen = true; return true; }
+        if (inCircle(x, y, W - 60, 60, 45 * scale)) { settingsOpen = true; return true; }
         
-        int slotSize = 110, gap = 10;
-        int startX = (W - (9 * slotSize + 8 * gap)) / 2, startY = H - 140;
+        int slotSize = (int)(110 * scale), gap = (int)(10 * scale);
+        int startX = (W - (9 * slotSize + 8 * gap)) / 2, startY = (int)(H - 140 * scale);
         for (int i = 0; i < 9; i++) {
             int sx = startX + i * (slotSize + gap);
             if (x >= sx && x <= sx + slotSize && y >= startY && y <= startY + slotSize) { Inventory.selectSlot(i); return true; }
         }
-        if (inCircle(x, y, W - 130, H - 280, 85)) { renderer.player.jump = true; return true; }
-        if (inCircle(x, y, W - 310, H - 150, 70)) { renderer.player.sneaking = true; return true; }
+        
+        // Прыжок (правый нижний угол или левый нижний, если левша)
+        float jX = leftHanded ? 100 * scale : W - 100 * scale;
+        if (inCircle(x, y, jX, H - 100 * scale, 75 * scale)) { renderer.player.jump = true; return true; }
+        // Присяд
+        if (inCircle(x, y, jX, H - 260 * scale, 60 * scale)) { renderer.player.sneaking = true; return true; }
+        
         return false;
     }
     
@@ -199,28 +238,44 @@ public class MainActivity extends Activity {
         @Override protected void onDraw(Canvas c) {
             super.onDraw(c);
             int W = getWidth(), H = getHeight();
+            float scale = getUiScale();
             
             float cx = W/2f, cy = H/2f;
             c.drawLine(cx-30, cy, cx-10, cy, stroke); c.drawLine(cx+10, cy, cx+30, cy, stroke);
             c.drawLine(cx, cy-30, cx, cy-10, stroke); c.drawLine(cx, cy+10, cx, cy+30, stroke);
             
-            c.drawCircle(W - 260, 60, 45, bg); c.drawCircle(W - 260, 60, 45, stroke); c.drawText(renderer.player.thirdPerson ? "3D" : "1D", W - 260, 75, text);
-            c.drawCircle(W - 160, 60, 45, bg); c.drawCircle(W - 160, 60, 45, stroke); c.drawText("🎒", W - 160, 75, text);
-            c.drawCircle(W - 60, 60, 45, bg); c.drawCircle(W - 60, 60, 45, stroke); c.drawText("⚙", W - 60, 75, text);
+            // Верхнее меню
+            c.drawCircle(W - 260 * scale, 60, 45 * scale, bg); c.drawCircle(W - 260 * scale, 60, 45 * scale, stroke); 
+            text.setTextSize(45f * scale); c.drawText(renderer.player.thirdPerson ? "3D" : "1D", W - 260 * scale, 60 + 15 * scale, text);
             
-            c.drawCircle(W - 250, H - 150, 60, bg); c.drawCircle(W - 250, H - 150, 60, stroke); c.drawText("⛏", W - 250, H - 130, text);
-            c.drawCircle(W - 110, H - 280, 60, bg); c.drawCircle(W - 110, H - 280, 60, stroke); c.drawText("🧱", W - 110, H - 260, text);
-            c.drawCircle(W - 130, H - 280, 85, bg); c.drawCircle(W - 130, H - 280, 85, stroke); c.drawText("↑", W - 130, H - 255, text);
-            c.drawCircle(W - 310, H - 150, 70, bg); c.drawCircle(W - 310, H - 150, 70, stroke); c.drawText("↓", W - 310, H - 130, text);
+            c.drawCircle(W - 160 * scale, 60, 45 * scale, bg); c.drawCircle(W - 160 * scale, 60, 45 * scale, stroke); 
+            c.drawText("🎒", W - 160 * scale, 60 + 15 * scale, text);
             
+            c.drawCircle(W - 60, 60, 45 * scale, bg); c.drawCircle(W - 60, 60, 45 * scale, stroke); 
+            c.drawText("⚙", W - 60, 60 + 15 * scale, text);
+            
+            // Кнопки действий
+            float btnX = leftHanded ? 100 : W - 100;
+            c.drawCircle(btnX, H - 150 * scale, 60 * scale, bg); c.drawCircle(btnX, H - 150 * scale, 60 * scale, stroke); c.drawText("⛏", btnX, H - 150 * scale + 20 * scale, text);
+            c.drawCircle(btnX, H - 300 * scale, 60 * scale, bg); c.drawCircle(btnX, H - 300 * scale, 60 * scale, stroke); c.drawText("🧱", btnX, H - 300 * scale + 20 * scale, text);
+            
+            // Прыжок и Присяд
+            float jumpX = leftHanded ? 100 * scale : W - 100 * scale;
+            c.drawCircle(jumpX, H - 100 * scale, 75 * scale, bg); c.drawCircle(jumpX, H - 100 * scale, 75 * scale, stroke); c.drawText("↑", jumpX, H - 100 * scale + 25 * scale, text);
+            c.drawCircle(jumpX, H - 260 * scale, 60 * scale, bg); c.drawCircle(jumpX, H - 260 * scale, 60 * scale, stroke); c.drawText("↓", jumpX, H - 260 * scale + 20 * scale, text);
+            
+            // Джойстик
+            float joyBaseX = leftHanded ? W - 200 : 200;
+            float joyBaseY = H - 200;
             if (joyPointerId != -1) {
-                c.drawCircle(joyCenterX, joyCenterY, joyRadius, stroke); c.drawCircle(knobX, knobY, 55f, fill);
+                c.drawCircle(joyCenterX, joyCenterY, joyRadius * scale, stroke); c.drawCircle(knobX, knobY, 55f * scale, fill);
             } else {
-                c.drawCircle(200, H - 250, joyRadius, stroke); c.drawCircle(200, H - 250, 55f, fill);
+                c.drawCircle(joyBaseX, joyBaseY, joyRadius * scale, stroke); c.drawCircle(joyBaseX, joyBaseY, 55f * scale, fill);
             }
             
-            int slotSize = 110, gap = 10;
-            int startX = (W - (9 * slotSize + 8 * gap)) / 2, startY = H - 140;
+            // Хотбар
+            int slotSize = (int)(110 * scale), gap = (int)(10 * scale);
+            int startX = (W - (9 * slotSize + 8 * gap)) / 2, startY = (int)(H - 140 * scale);
             for (int i = 0; i < 9; i++) {
                 int sx = startX + i * (slotSize + gap);
                 Paint p = new Paint(Paint.ANTI_ALIAS_FLAG); p.setStyle(Paint.Style.FILL);
@@ -247,13 +302,8 @@ public class MainActivity extends Activity {
             int startX = (W - (9 * slotSize + 8 * gap)) / 2, startY = 150;
             for (int row = 0; row < 3; row++) for (int i = 0; i < 9; i++) c.drawRect(startX + i*(slotSize+gap), startY + row*(slotSize+gap), startX + i*(slotSize+gap) + slotSize, startY + row*(slotSize+gap) + slotSize, stroke);
             
-            int gs = 80, gx = W/2 - 300, gy = H - 300;
-            text.setTextSize(40f); c.drawText("Крафт", gx + 80, gy - 20, text);
-            for(int i=0; i<2; i++) for(int j=0; j<2; j++) c.drawRect(gx + i*(gs+10), gy + j*(gs+10), gx + i*(gs+10)+gs, gy + j*(gs+10)+gs, stroke);
-            c.drawRect(gx + 200, gy + 45, gx + 200 + gs, gy + 45 + gs, stroke);
-            
-            int cx = W/2 + 150, cy = H - 350;
-            if (skinBitmap != null) c.drawBitmap(skinBitmap, null, new Rect(cx-100, cy, cx+100, cy+200), skinPaint);
+            int cx = W/2 + 150, cy = H - 300;
+            if (skinBitmap != null) c.drawBitmap(skinBitmap, null, new Rect(cx-100, cy-100, cx+100, cy+100), skinPaint);
             
             int hbY = H - 140, hbX = (W - (9 * 110 + 8 * 10)) / 2;
             for (int i = 0; i < 9; i++) c.drawRect(hbX + i * 120, hbY, hbX + i * 120 + 110, hbY+110, stroke);
@@ -263,12 +313,37 @@ public class MainActivity extends Activity {
             Paint dim = new Paint(); dim.setColor(Color.argb(220, 0, 0, 0)); c.drawRect(0, 0, W, H, dim);
             text.setTextSize(60f); c.drawText("Настройки", W/2f, 100, text);
             c.drawCircle(W - 60, 60, 45, bg); c.drawCircle(W - 60, 60, 45, stroke); c.drawText("X", W - 60, 75, text);
-            text.setTextSize(45f); c.drawText("Скин персонажа:", W/2f, H/2 - 100, text);
             
+            text.setTextSize(40f); c.drawText("Выбор мира:", W/2f, H/2 - 200, text);
+            int btnSize = 110, gap = 25;
+            int totalW = 5 * btnSize + 4 * gap;
+            int startX = (W - totalW) / 2, startY = H / 2 - 150;
+            for (int i = 0; i < 5; i++) {
+                int bx = startX + i * (btnSize + gap);
+                boolean exists = renderer.worldExists(i + 1);
+                boolean isCur = renderer.currentWorld == (i + 1);
+                Paint p = new Paint(Paint.ANTI_ALIAS_FLAG); p.setStyle(Paint.Style.FILL);
+                p.setColor(isCur ? Color.rgb(200, 160, 40) : (exists ? Color.rgb(80, 130, 200) : Color.rgb(70, 70, 70)));
+                c.drawRect(bx, startY, bx + btnSize, startY + btnSize, p);
+                c.drawRect(bx, startY, bx + btnSize, startY + btnSize, stroke);
+                text.setTextSize(60f); c.drawText(String.valueOf(i + 1), bx + btnSize/2f, startY + btnSize/2f + 20, text);
+            }
+            
+            // Настройки управления
             Paint btnBg = new Paint(); btnBg.setColor(Color.rgb(80, 130, 200));
-            c.drawRect(W/2 - 200, H/2 - 50, W/2 + 200, H/2 + 30, btnBg);
-            c.drawRect(W/2 - 200, H/2 - 50, W/2 + 200, H/2 + 30, stroke);
-            text.setTextSize(40f); c.drawText("Загрузить из галереи", W/2f, H/2 + 5, text);
+            
+            text.setTextSize(36f); c.drawText("Раскладка (Левша/Правша)", W/2f, H/2 + 30, text);
+            c.drawRect(W/2 - 200, H/2 + 50, W/2 + 200, H/2 + 130, btnBg); c.drawRect(W/2 - 200, H/2 + 50, W/2 + 200, H/2 + 130, stroke);
+            text.setTextSize(40f); c.drawText(leftHanded ? "Режим: Левша" : "Режим: Правша", W/2f, H/2 + 105, text);
+            
+            text.setTextSize(36f); c.drawText("Размер кнопок", W/2f, H/2 + 180, text);
+            c.drawRect(W/2 - 200, H/2 + 150, W/2 + 200, H/2 + 230, btnBg); c.drawRect(W/2 - 200, H/2 + 150, W/2 + 200, H/2 + 230, stroke);
+            text.setTextSize(40f); c.drawText(uiSizeMode == 0 ? "Маленький" : (uiSizeMode == 2 ? "Большой" : "Средний"), W/2f, H/2 + 205, text);
+            
+            // Загрузка скина
+            text.setTextSize(36f); c.drawText("Скин персонажа", W/2f, H/2 + 280, text);
+            c.drawRect(W/2 - 200, H/2 + 250, W/2 + 200, H/2 + 330, btnBg); c.drawRect(W/2 - 200, H/2 + 250, W/2 + 200, H/2 + 330, stroke);
+            text.setTextSize(40f); c.drawText("Загрузить", W/2f, H/2 + 305, text);
         }
     }
     
