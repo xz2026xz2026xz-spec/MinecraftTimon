@@ -31,6 +31,7 @@ public class MyGLRenderer implements GLSurfaceView.Renderer {
     private File saveFile;
     public int currentWorld = 1;
     private volatile boolean savePending = false;
+    private volatile int pendingSwitch = -1; // Защита от краша при смене мира
     
     private FloatBuffer bodyVertexBuffer, headVertexBuffer;
     
@@ -87,7 +88,9 @@ public class MyGLRenderer implements GLSurfaceView.Renderer {
         }
     }
     
-    public void requestSwitchWorld(int index) {
+    public void requestSwitchWorld(int index) { pendingSwitch = index; } // Теперь просто ставим флаг!
+    
+    private void doSwitchWorld(int index) {
         world.saveToFile(saveFile, player.x, player.y, player.z, player.yaw, player.pitch);
         currentWorld = index;
         saveFile = new File(ctx.getFilesDir(), "world_" + index + ".dat");
@@ -126,7 +129,6 @@ public class MyGLRenderer implements GLSurfaceView.Renderer {
         savePending = true;
     }
     
-    // --- Отрисовка мобов с текстурами ---
     private void drawMobPart(float x, float y, float z, float yaw, FloatBuffer vb, int texIndex, boolean isHead) {
         Matrix.setIdentityM(modelMatrix, 0);
         Matrix.translateM(modelMatrix, 0, x, y + 0.5f, z);
@@ -138,16 +140,17 @@ public class MyGLRenderer implements GLSurfaceView.Renderer {
         GLES20.glUniformMatrix4fv(mvpMatrixHandle, 1, false, mvpMatrix, 0);
         
         GLES20.glEnableVertexAttribArray(positionHandle); GLES20.glVertexAttribPointer(positionHandle, 3, GLES20.GL_FLOAT, false, 0, vb);
-        GLES20.glDisableVertexAttribArray(colorHandle); // Цвет не нужен, только текстура
+        GLES20.glDisableVertexAttribArray(colorHandle);
         
-        // UV координаты для мобов (берем из атласа)
         float tileStep = 1.0f / TextureManager.GRID_SIZE;
         int col = texIndex % TextureManager.GRID_SIZE;
         int row = texIndex / TextureManager.GRID_SIZE;
-        float u1 = col * tileStep;
-        float u2 = u1 + tileStep;
-        float v2 = 1.0f - (row * tileStep);
-        float v1 = v2 - tileStep;
+        float epsilon = 0.001f;
+        
+        float u1 = col * tileStep + epsilon;
+        float u2 = (col + 1) * tileStep - epsilon;
+        float v2 = 1.0f - (row * tileStep) - epsilon;
+        float v1 = 1.0f - ((row + 1) * tileStep) + epsilon;
         
         float[] tCoords = new float[72];
         for(int i=0; i<6; i++) {
@@ -164,16 +167,22 @@ public class MyGLRenderer implements GLSurfaceView.Renderer {
     }
     
     private void drawMob(Sheep s) {
-        drawMobPart(s.x, s.y, s.z, s.yaw, bodyVertexBuffer, 10, false); // Тело овцы
-        drawMobPart(s.x, s.y, s.z, s.yaw, headVertexBuffer, 9, true);   // Лицо овцы
+        drawMobPart(s.x, s.y, s.z, s.yaw, bodyVertexBuffer, 10, false);
+        drawMobPart(s.x, s.y, s.z, s.yaw, headVertexBuffer, 9, true);
     }
     
     private void drawMob(Dog d) {
-        drawMobPart(d.x, d.y, d.z, d.yaw, bodyVertexBuffer, 12, false); // Тело собаки
-        drawMobPart(d.x, d.y, d.z, d.yaw, headVertexBuffer, 11, true);  // Лицо собаки
+        drawMobPart(d.x, d.y, d.z, d.yaw, bodyVertexBuffer, 12, false);
+        drawMobPart(d.x, d.y, d.z, d.yaw, headVertexBuffer, 11, true);
     }
     
     @Override public void onDrawFrame(GL10 unused) {
+        if (pendingSwitch != -1) {
+            int n = pendingSwitch;
+            pendingSwitch = -1;
+            if (n != currentWorld) doSwitchWorld(n); // Выполняем смену мира только в GL-потоке
+        }
+        
         GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT | GLES20.GL_DEPTH_BUFFER_BIT);
         player.update(world);
         for (Sheep s : world.sheepList) s.update(world);
@@ -247,7 +256,7 @@ public class MyGLRenderer implements GLSurfaceView.Renderer {
             for (int j = 0; j < world.sheepList.size(); j++) {
                 Sheep s = world.sheepList.get(j);
                 float ddx = px - s.x, ddy = py - (s.y + 0.5f), ddz = pz - s.z;
-                if (ddx*ddx + ddy*ddy + ddz*ddz < 0.8f) return j;
+                if (ddx*ddx + ddy*ddy + ddz*dz < 0.8f) return j;
             }
             px += dx * 0.1f; py += dy * 0.1f; pz += dz * 0.1f;
         }

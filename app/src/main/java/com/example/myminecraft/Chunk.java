@@ -26,32 +26,26 @@ public class Chunk {
                     byte block = world.getBlock(wx, wy, wz);
                     if (block == Block.AIR) continue;
                     
-                    // Верх (Текстура)
                     if (!Block.isSolid(world.getBlock(wx, wy + 1, wz))) {
                         addFace(verts, cols, texCoords, Block.getColor(block, 0), getTexIndex(block, 0),
                             wx, wy+1, wz+1,  wx+1, wy+1, wz+1,  wx+1, wy+1, wz, wx, wy+1, wz);
                     }
-                    // Низ
                     if (!Block.isSolid(world.getBlock(wx, wy - 1, wz))) {
                         addFace(verts, cols, texCoords, Block.getColor(block, 1), getTexIndex(block, 1),
                             wx, wy, wz,  wx+1, wy, wz,  wx+1, wy, wz+1,  wx, wy, wz+1);
                     }
-                    // Перед
                     if (!Block.isSolid(world.getBlock(wx, wy, wz - 1))) {
                         addFace(verts, cols, texCoords, Block.getColor(block, 2), getTexIndex(block, 2),
                             wx, wy, wz,  wx, wy+1, wz,  wx+1, wy+1, wz,  wx+1, wy, wz);
                     }
-                    // Зад
                     if (!Block.isSolid(world.getBlock(wx, wy, wz + 1))) {
                         addFace(verts, cols, texCoords, Block.getColor(block, 2), getTexIndex(block, 2),
                             wx+1, wy, wz+1,  wx+1, wy+1, wz+1,  wx, wy+1, wz+1,  wx, wy, wz+1);
                     }
-                    // Лево
                     if (!Block.isSolid(world.getBlock(wx - 1, wy, wz))) {
                         addFace(verts, cols, texCoords, Block.getColor(block, 2), getTexIndex(block, 2),
                             wx, wy, wz+1,  wx, wy+1, wz+1,  wx, wy+1, wz,  wx, wy, wz);
                     }
-                    // Право
                     if (!Block.isSolid(world.getBlock(wx + 1, wy, wz))) {
                         addFace(verts, cols, texCoords, Block.getColor(block, 2), getTexIndex(block, 2),
                             wx+1, wy, wz,  wx+1, wy+1, wz,  wx+1, wy+1, wz+1,  wx+1, wy, wz+1);
@@ -73,14 +67,14 @@ public class Chunk {
     
     private int getTexIndex(byte block, int face) {
         switch (block) {
-            case Block.GRASS: return face == 0 ? 0 : (face == 1 ? 2 : 1); // Верх, Низ, Бока
+            case Block.GRASS: return face == 0 ? 0 : (face == 1 ? 2 : 1);
             case Block.DIRT: return 2;
             case Block.STONE: return 3;
-            case Block.WOOD: return face == 0 || face == 1 ? 4 : 5; // Верх/Низ, Бока
+            case Block.WOOD: return face == 0 || face == 1 ? 4 : 5;
             case Block.LEAVES: return 6;
             case Block.PLANKS: return 7;
             case Block.COBBLESTONE: return 8;
-            default: return -1; // Цвет (для мяса, яблок и т.д.)
+            default: return -1;
         }
     }
     
@@ -96,18 +90,18 @@ public class Chunk {
             return;
         }
         
-        // Вычисляем UV координаты из атласа
         float tileStep = 1.0f / TextureManager.GRID_SIZE;
         int col = texIndex % TextureManager.GRID_SIZE;
         int row = texIndex / TextureManager.GRID_SIZE;
         
-        // OpenGL перевернут по Y, поэтому считаем с конца
-        float u1 = col * tileStep;
-        float u2 = u1 + tileStep;
-        float v2 = 1.0f - (row * tileStep);
-        float v1 = v2 - tileStep;
+        // Отступаем от краев на 1 пиксель (чтобы не захватывать соседние текстуры)
+        float epsilon = 0.001f; 
         
-        // 6 вершин (2 треугольника) * (u, v)
+        float u1 = col * tileStep + epsilon;
+        float u2 = (col + 1) * tileStep - epsilon;
+        float v2 = 1.0f - (row * tileStep) - epsilon;
+        float v1 = 1.0f - ((row + 1) * tileStep) + epsilon;
+        
         texCoords.add(u1); texCoords.add(v1); texCoords.add(u2); texCoords.add(v1); texCoords.add(u2); texCoords.add(v2);
         texCoords.add(u1); texCoords.add(v1); texCoords.add(u2); texCoords.add(v2); texCoords.add(u1); texCoords.add(v2);
     }
