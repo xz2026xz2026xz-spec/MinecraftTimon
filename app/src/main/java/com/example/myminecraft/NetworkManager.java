@@ -15,8 +15,14 @@ public class NetworkManager {
     
     public String myName = "Player_" + (int)(Math.random() * 9000 + 1000);
     public List<String> playerNames = new ArrayList<>();
-    public List<String> chatMessages = new ArrayList<>();
     
+    public static class ChatMessage {
+        public String text;
+        public long time;
+        public ChatMessage(String t) { text = t; time = System.currentTimeMillis(); }
+    }
+    
+    public List<ChatMessage> chatMessages = new ArrayList<>();
     private List<DataOutputStream> clientOutputs = new ArrayList<>();
     private Socket socket;
     private DataOutputStream out;
@@ -51,13 +57,13 @@ public class NetworkManager {
                     DataInputStream in = new DataInputStream(socket.getInputStream());
                     isConnected = true;
                     
-                    out.writeInt(3); out.writeUTF(myName); // Отправляем свой ник
+                    out.writeInt(3); out.writeUTF(myName);
                     
                     while (isConnected) {
                         int type = in.readInt();
                         if (type == 2) {
                             String msg = in.readUTF();
-                            synchronized (chatMessages) { chatMessages.add(msg); }
+                            addChatMessage(msg);
                         } else if (type == 4) {
                             String listStr = in.readUTF();
                             synchronized(playerNames) {
@@ -71,8 +77,15 @@ public class NetworkManager {
         }).start();
     }
     
+    private void addChatMessage(String msg) {
+        synchronized (chatMessages) {
+            chatMessages.add(new ChatMessage(msg));
+            if (chatMessages.size() > 20) chatMessages.remove(0);
+        }
+    }
+    
     public void sendChat(String msg) {
-        synchronized (chatMessages) { chatMessages.add(myName + ": " + msg); }
+        addChatMessage(myName + ": " + msg);
         if (!isConnected || out == null) return;
         try { out.writeInt(2); out.writeUTF(msg); } catch (Exception e) {}
     }
@@ -102,7 +115,7 @@ public class NetworkManager {
     }
     
     private void broadcastChat(String msg) {
-        synchronized (chatMessages) { chatMessages.add(msg); } // Можно добавить ник
+        addChatMessage(msg);
         synchronized (clientOutputs) {
             for (DataOutputStream o : clientOutputs) {
                 try { o.writeInt(2); o.writeUTF(msg); } catch (Exception e) {}
