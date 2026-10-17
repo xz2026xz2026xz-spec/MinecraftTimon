@@ -1,8 +1,10 @@
 package com.example.myminecraft;
 
 import android.app.Activity;
+import android.app.AlertDialog;
 import android.content.Context;
 import android.content.Intent;
+import android.content.SharedPreferences;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.graphics.Canvas;
@@ -31,9 +33,10 @@ public class MainActivity extends Activity {
     private MyGLRenderer renderer;
     private OverlayView overlay;
     private EditText chatInput;
+    private SharedPreferences prefs;
     
     private int movePointerId = -1, lookPointerId = -1;
-    private int bSwordId = -1, bJumpId = -1, bSprintId = -1, bDropId = -1, bSneakId = -1, bPlaceId = -1;
+    private int bSwordId = -1, bJumpId = -1, bSprintId = -1, bDropId = -1, bPlaceId = -1, bSneakId = -1;
     
     private float moveCenterX, moveCenterY, knobX, knobY;
     private float moveRadius = 150f;
@@ -54,7 +57,15 @@ public class MainActivity extends Activity {
         getWindow().setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_NOTHING);
         loadSkin();
         
+        prefs = getSharedPreferences("TimonCraftPrefs", Context.MODE_PRIVATE);
+        
         renderer = new MyGLRenderer(this);
+        // Загружаем сохраненный ник
+        String savedName = prefs.getString("nickname", null);
+        if (savedName != null && !savedName.isEmpty()) {
+            renderer.network.myName = savedName;
+        }
+        
         glView = new GLSurfaceView(this);
         glView.setEGLContextClientVersion(2);
         glView.setRenderer(renderer);
@@ -103,6 +114,37 @@ public class MainActivity extends Activity {
         imm.hideSoftInputFromWindow(chatInput.getWindowToken(), 0);
     }
     
+    private void showNicknameDialog() {
+        AlertDialog.Builder builder = new AlertDialog.Builder(this);
+        builder.setTitle("Введите ваш никнейм");
+        
+        final EditText input = new EditText(this);
+        input.setText(renderer.network.myName);
+        builder.setView(input);
+        
+        builder.setPositiveButton("Сохранить", (dialog, which) -> {
+            String newName = input.getText().toString().trim();
+            if (!newName.isEmpty()) {
+                renderer.network.myName = newName;
+                prefs.edit().putString("nickname", newName).apply();
+                Toast.makeText(MainActivity.this, "Ник изменен на " + newName, Toast.LENGTH_SHORT).show();
+                // Обновляем список игроков, если мы на сервере
+                if (renderer.network.isConnected) {
+                    synchronized(renderer.network.playerNames) {
+                        if (renderer.network.isServer) {
+                            // Если мы хост, просто меняем имя
+                            if (renderer.network.playerNames.size() > 0) {
+                                renderer.network.playerNames.set(0, newName + " (Хост)");
+                            }
+                        }
+                    }
+                }
+            }
+        });
+        builder.setNegativeButton("Отмена", (dialog, which) -> dialog.cancel());
+        builder.show();
+    }
+    
     private void loadSkin() {
         try { FileInputStream fis = openFileInput("skin.png"); skinBitmap = BitmapFactory.decodeStream(fis); fis.close(); } catch (Exception e) { skinBitmap = null; }
     }
@@ -133,7 +175,6 @@ public class MainActivity extends Activity {
         float bSize = 120 * scale, gap = 15 * scale;
         float startX = leftHanded ? 20 * scale : W - (bSize * 2 + gap) - 20 * scale;
         float startY = H - (bSize * 3 + gap * 2) - 200 * scale;
-        
         float cx1 = startX, cx2 = startX + bSize + gap;
         float cy1 = startY, cy2 = startY + bSize + gap, cy3 = startY + (bSize + gap) * 2;
 
@@ -150,8 +191,8 @@ public class MainActivity extends Activity {
             else if (inBtn(x, y, cx2, cy1, bSize) && bJumpId == -1) { bJumpId = pId; renderer.player.jump = true; }
             else if (inBtn(x, y, cx1, cy2, bSize) && bSprintId == -1) { bSprintId = pId; renderer.player.sprinting = true; }
             else if (inBtn(x, y, cx2, cy2, bSize) && bDropId == -1) { bDropId = pId; Inventory.dropSelected(); }
-            else if (inBtn(x, y, cx1, cy3, bSize) && bSneakId == -1) { bSneakId = pId; renderer.player.sneaking = true; }
-            else if (inBtn(x, y, cx2, cy3, bSize) && bPlaceId == -1) { bPlaceId = pId; doAction(false); }
+            else if (inBtn(x, y, cx1, cy3, bSize) && bPlaceId == -1) { bPlaceId = pId; doAction(false); }
+            else if (inBtn(x, y, cx2, cy3, bSize) && bSneakId == -1) { bSneakId = pId; renderer.player.sneaking = true; }
             else if (!isJoySide && lookPointerId == -1) { lookPointerId = pId; lastSwipeX = x; lastSwipeY = y; }
             overlay.invalidate();
         } 
@@ -185,8 +226,8 @@ public class MainActivity extends Activity {
             else if (pId == bJumpId) bJumpId = -1;
             else if (pId == bSprintId) { bSprintId = -1; renderer.player.sprinting = false; }
             else if (pId == bDropId) bDropId = -1;
-            else if (pId == bSneakId) { bSneakId = -1; renderer.player.sneaking = false; }
             else if (pId == bPlaceId) bPlaceId = -1;
+            else if (pId == bSneakId) { bSneakId = -1; renderer.player.sneaking = false; }
             overlay.invalidate();
         }
         return true;
@@ -208,7 +249,7 @@ public class MainActivity extends Activity {
                 }
             } else {
                 if (Inventory.getSelectedBlock() != Block.AIR) {
-                    int bx = block[0], by = block[1] + 1, bz = block[2];
+                    int bx = block[3], by = block[4], bz = block[5];
                     if (!renderer.world.isInsidePlayer(bx, by, bz, renderer.player.x, renderer.player.y, renderer.player.z)) {
                         renderer.world.setBlock(bx, by, bz, Inventory.getSelectedBlock());
                         renderer.markDirty(bx, by, bz);
@@ -227,7 +268,6 @@ public class MainActivity extends Activity {
             
             int slotSize = 100, hGap = 10;
             int startX = (W - (9 * slotSize + 8 * hGap)) / 2, startY = 150;
-            // Клики по слотам инвентаря (3x9)
             for (int row = 0; row < 3; row++) {
                 for (int i = 0; i < 9; i++) {
                     int sx = startX + i*(slotSize+hGap);
@@ -239,8 +279,7 @@ public class MainActivity extends Activity {
                     }
                 }
             }
-            // Клики по хотбару внутри инвентаря
-            int hotbarY = (int)(H - 350 * scale);
+            int hotbarY = H - 200 * (int)scale;
             for (int i = 0; i < 9; i++) {
                 int sx = startX + i*(slotSize+hGap);
                 if (x >= sx && x <= sx + slotSize && y >= hotbarY && y <= hotbarY + slotSize) {
@@ -255,7 +294,7 @@ public class MainActivity extends Activity {
             if (inCircle(x, y, W - 60, 60, 45 * scale)) { settingsOpen = false; return true; }
             int btnSize = (int)(110 * scale), gap = (int)(25 * scale);
             int totalW = 5 * btnSize + 4 * gap;
-            int startX = (W - totalW) / 2, startY = H / 2 - 200;
+            int startX = (W - totalW) / 2, startY = H / 2 - 250;
             for (int i = 0; i < 5; i++) {
                 int bx = startX + i * (btnSize + gap);
                 if (x >= bx && x <= bx + btnSize && y >= startY && y <= startY + btnSize) {
@@ -263,22 +302,27 @@ public class MainActivity extends Activity {
                     settingsOpen = false; return true;
                 }
             }
-            if (x > W/2 - 200 && x < W/2 + 200 && y > H/2 + 40 && y < H/2 + 120) { leftHanded = !leftHanded; return true; }
-            if (x > W/2 - 200 && x < W/2 + 200 && y > H/2 + 140 && y < H/2 + 220) { uiSizeMode = (uiSizeMode + 1) % 3; return true; }
-            if (x > W/2 - 200 && x < W/2 + 200 && y > H/2 + 240 && y < H/2 + 320) {
+            
+            // Кнопка Сменить ник (Новая!)
+            if (x > W/2 - 200 && x < W/2 + 200 && y > H/2 - 100 && y < H/2 - 20) {
+                showNicknameDialog(); return true;
+            }
+            
+            if (x > W/2 - 200 && x < W/2 + 200 && y > H/2 + 10 && y < H/2 + 90) { leftHanded = !leftHanded; return true; }
+            if (x > W/2 - 200 && x < W/2 + 200 && y > H/2 + 110 && y < H/2 + 190) { uiSizeMode = (uiSizeMode + 1) % 3; return true; }
+            if (x > W/2 - 200 && x < W/2 + 200 && y > H/2 + 210 && y < H/2 + 290) {
                 Intent intent = new Intent(Intent.ACTION_PICK); intent.setType("image/*");
                 startActivityForResult(intent, 100); return true;
             }
-            if (x > W/2 - 200 && x < W/2 && y > H/2 + 340 && y < H/2 + 420) {
+            if (x > W/2 - 200 && x < W/2 && y > H/2 + 310 && y < H/2 + 390) {
                 renderer.network.startServer(renderer.world); Toast.makeText(this, "Сервер запущен!", Toast.LENGTH_SHORT).show(); return true;
             }
-            if (x > W/2 && x < W/2 + 200 && y > H/2 + 340 && y < H/2 + 420) {
+            if (x > W/2 && x < W/2 + 200 && y > H/2 + 310 && y < H/2 + 390) {
                 renderer.network.connect("127.0.0.1"); Toast.makeText(this, "Подключение...", Toast.LENGTH_SHORT).show(); return true;
             }
             return false;
         }
         
-        // Верхние кнопки
         if (inCircle(x, y, W - 320 * scale, 60, 45 * scale)) { 
             chatInput.setVisibility(View.VISIBLE); chatInput.requestFocus();
             InputMethodManager imm = (InputMethodManager) getSystemService(Context.INPUT_METHOD_SERVICE);
@@ -331,7 +375,6 @@ public class MainActivity extends Activity {
             c.drawLine(cx-30, cy, cx-10, cy, stroke); c.drawLine(cx+10, cy, cx+30, cy, stroke);
             c.drawLine(cx, cy-30, cx, cy-10, stroke); c.drawLine(cx, cy+10, cx, cy+30, stroke);
             
-            // Верхние кнопки (сгруппированы)
             c.drawCircle(W - 320 * scale, 60, 45 * scale, bg); c.drawCircle(W - 320 * scale, 60, 45 * scale, stroke); 
             text.setTextSize(45f * scale); c.drawText("💬", W - 320 * scale, 60 + 15 * scale, text);
             c.drawCircle(W - 230 * scale, 60, 45 * scale, bg); c.drawCircle(W - 230 * scale, 60, 45 * scale, stroke); 
@@ -339,7 +382,6 @@ public class MainActivity extends Activity {
             c.drawCircle(W - 140 * scale, 60, 45 * scale, bg); c.drawCircle(W - 140 * scale, 60, 45 * scale, stroke); c.drawText("🎒", W - 140 * scale, 60 + 15 * scale, text);
             c.drawCircle(W - 50 * scale, 60, 45 * scale, bg); c.drawCircle(W - 50 * scale, 60, 45 * scale, stroke); c.drawText("⚙", W - 50 * scale, 60 + 15 * scale, text);
             
-            // Список игроков
             Paint listBg = new Paint(); listBg.setColor(Color.argb(150, 0, 0, 0));
             text.setTextAlign(Paint.Align.LEFT); text.setTextSize(35f * scale);
             int listY = 50;
@@ -354,12 +396,10 @@ public class MainActivity extends Activity {
                 }
             }
             
-            // Чат (исчезает через 15 сек)
             Paint chatBg = new Paint(); chatBg.setColor(Color.argb(120, 0, 0, 0));
             text.setTextSize(35f * scale);
             int msgY = Math.max(listY + 50, 200 * (int)scale);
             long now = System.currentTimeMillis();
-            
             synchronized (renderer.network.chatMessages) {
                 for (int i = 0; i < renderer.network.chatMessages.size(); i++) {
                     NetworkManager.ChatMessage msg = renderer.network.chatMessages.get(i);
@@ -384,9 +424,12 @@ public class MainActivity extends Activity {
             float cx1 = startX, cx2 = startX + bSize + gap;
             float cy1 = startY, cy2 = startY + bSize + gap, cy3 = startY + (bSize + gap) * 2;
             
-            drawPEBtn(c, cx1, cy1, bSize, "⚔", bSwordId != -1); drawPEBtn(c, cx2, cy1, bSize, "↑", bJumpId != -1);
-            drawPEBtn(c, cx1, cy2, bSize, "»", bSprintId != -1); drawPEBtn(c, cx2, cy2, bSize, "↩️", bDropId != -1);
-            drawPEBtn(c, cx1, cy3, bSize, "↓", bSneakId != -1); drawPEBtn(c, cx2, cy3, bSize, "+", bPlaceId != -1);
+            drawPEBtn(c, cx1, cy1, bSize, "⚔", bSwordId != -1, 100); 
+            drawPEBtn(c, cx2, cy1, bSize, "↑", bJumpId != -1, 100);
+            drawPEBtn(c, cx1, cy2, bSize, "»", bSprintId != -1, 100); 
+            drawPEBtn(c, cx2, cy2, bSize, "↩️", bDropId != -1, 50); 
+            drawPEBtn(c, cx1, cy3, bSize, "+", bPlaceId != -1, 100); 
+            drawPEBtn(c, cx2, cy3, bSize, "↓", bSneakId != -1, 100); 
             
             float barY = H - 185 * scale;
             float iconSize = 45f * scale;
@@ -408,10 +451,10 @@ public class MainActivity extends Activity {
             if (settingsOpen) drawSettings(c, W, H);
         }
         
-        private void drawPEBtn(Canvas c, float x, float y, float size, String label, boolean pressed) {
+        private void drawPEBtn(Canvas c, float x, float y, float size, String label, boolean pressed, int alpha) {
             RectF r = new RectF(x, y, x + size, y + size);
             Paint p = new Paint(Paint.ANTI_ALIAS_FLAG);
-            p.setStyle(Paint.Style.FILL); p.setColor(pressed ? Color.argb(150, 255, 255, 255) : Color.argb(100, 50, 50, 50));
+            p.setStyle(Paint.Style.FILL); p.setColor(pressed ? Color.argb(150, 255, 255, 255) : Color.argb(alpha, 50, 50, 50));
             c.drawRect(r, p);
             p.setStyle(Paint.Style.STROKE); p.setColor(Color.WHITE); p.setStrokeWidth(4f); c.drawRect(r, p);
             text.setTextSize(size * 0.6f); text.setTextAlign(Paint.Align.CENTER); c.drawText(label, x + size/2f, y + size/2f + size * 0.2f, text);
@@ -446,7 +489,6 @@ public class MainActivity extends Activity {
             
             int slotSize = 100, hGap = 10;
             int startX = (W - (9 * slotSize + 8 * hGap)) / 2, startY = 150;
-            // Рюкзак
             for (int row = 0; row < 3; row++) {
                 for (int i = 0; i < 9; i++) {
                     int sx = startX + i*(slotSize+hGap);
@@ -455,8 +497,7 @@ public class MainActivity extends Activity {
                     drawSlot(c, sx, sy, slotSize, Inventory.slots[idx], false, idx == Inventory.movingSlot);
                 }
             }
-            // Хотбар
-            int hotbarY = (int)(H - 350 * getUiScale());
+            int hotbarY = H - 200 * (int)getUiScale();
             for (int i = 0; i < 9; i++) {
                 int sx = startX + i*(slotSize+hGap);
                 drawSlot(c, sx, hotbarY, slotSize, Inventory.slots[i], i == Inventory.selectedSlot, i == Inventory.movingSlot);
@@ -474,7 +515,7 @@ public class MainActivity extends Activity {
             text.setTextSize(40f); c.drawText("Выбор мира:", W/2f, H/2 - 250, text);
             int btnSize = 110, gap = 25;
             int totalW = 5 * btnSize + 4 * gap;
-            int startX = (W - totalW) / 2, startY = H / 2 - 200;
+            int startX = (W - totalW) / 2, startY = H / 2 - 250 + 40;
             for (int i = 0; i < 5; i++) {
                 int bx = startX + i * (btnSize + gap);
                 boolean exists = renderer.worldExists(i + 1);
@@ -487,25 +528,30 @@ public class MainActivity extends Activity {
             }
             
             Paint btnBg = new Paint(); btnBg.setColor(Color.rgb(80, 130, 200));
-            text.setTextSize(36f); c.drawText("Раскладка", W/2f, H/2 + 70, text);
-            c.drawRect(W/2 - 200, H/2 + 40, W/2 + 200, H/2 + 120, btnBg); c.drawRect(W/2 - 200, H/2 + 40, W/2 + 200, H/2 + 120, stroke);
-            text.setTextSize(40f); c.drawText(leftHanded ? "Левша" : "Правша", W/2f, H/2 + 95, text);
             
-            text.setTextSize(36f); c.drawText("Размер", W/2f, H/2 + 170, text);
-            c.drawRect(W/2 - 200, H/2 + 140, W/2 + 200, H/2 + 220, btnBg); c.drawRect(W/2 - 200, H/2 + 140, W/2 + 200, H/2 + 220, stroke);
-            text.setTextSize(40f); c.drawText(uiSizeMode == 0 ? "Маленький" : (uiSizeMode == 2 ? "Большой" : "Средний"), W/2f, H/2 + 195, text);
+            // Кнопка Сменить Ник (Новая!)
+            c.drawRect(W/2 - 200, H/2 - 100, W/2 + 200, H/2 - 20, btnBg); c.drawRect(W/2 - 200, H/2 - 100, W/2 + 200, H/2 - 20, stroke);
+            text.setTextSize(40f); c.drawText("Сменить ник", W/2f, H/2 - 55, text);
             
-            text.setTextSize(36f); c.drawText("Скин", W/2f, H/2 + 270, text);
-            c.drawRect(W/2 - 200, H/2 + 240, W/2 + 200, H/2 + 320, btnBg); c.drawRect(W/2 - 200, H/2 + 240, W/2 + 200, H/2 + 320, stroke);
-            text.setTextSize(40f); c.drawText("Загрузить", W/2f, H/2 + 295, text);
+            text.setTextSize(36f); c.drawText("Раскладка", W/2f, H/2 + 40, text);
+            c.drawRect(W/2 - 200, H/2 + 10, W/2 + 200, H/2 + 90, btnBg); c.drawRect(W/2 - 200, H/2 + 10, W/2 + 200, H/2 + 90, stroke);
+            text.setTextSize(40f); c.drawText(leftHanded ? "Левша" : "Правша", W/2f, H/2 + 65, text);
+            
+            text.setTextSize(36f); c.drawText("Размер", W/2f, H/2 + 140, text);
+            c.drawRect(W/2 - 200, H/2 + 110, W/2 + 200, H/2 + 190, btnBg); c.drawRect(W/2 - 200, H/2 + 110, W/2 + 200, H/2 + 190, stroke);
+            text.setTextSize(40f); c.drawText(uiSizeMode == 0 ? "Маленький" : (uiSizeMode == 2 ? "Большой" : "Средний"), W/2f, H/2 + 165, text);
+            
+            text.setTextSize(36f); c.drawText("Скин", W/2f, H/2 + 240, text);
+            c.drawRect(W/2 - 200, H/2 + 210, W/2 + 200, H/2 + 290, btnBg); c.drawRect(W/2 - 200, H/2 + 210, W/2 + 200, H/2 + 290, stroke);
+            text.setTextSize(40f); c.drawText("Загрузить", W/2f, H/2 + 265, text);
             
             Paint netBtn = new Paint(); netBtn.setColor(Color.rgb(60, 180, 60));
-            c.drawRect(W/2 - 200, H/2 + 340, W/2 - 10, H/2 + 420, netBtn); c.drawRect(W/2 - 200, H/2 + 340, W/2 - 10, H/2 + 420, stroke);
-            text.setTextSize(36f); c.drawText("Открыть мир", W/2 - 105, H/2 + 395, text);
+            c.drawRect(W/2 - 200, H/2 + 310, W/2 - 10, H/2 + 390, netBtn); c.drawRect(W/2 - 200, H/2 + 310, W/2 - 10, H/2 + 390, stroke);
+            text.setTextSize(36f); c.drawText("Открыть мир", W/2 - 105, H/2 + 365, text);
             
             netBtn.setColor(Color.rgb(180, 60, 60));
-            c.drawRect(W/2 + 10, H/2 + 340, W/2 + 200, H/2 + 420, netBtn); c.drawRect(W/2 + 10, H/2 + 340, W/2 + 200, H/2 + 420, stroke);
-            c.drawText("Подключиться", W/2 + 105, H/2 + 395, text);
+            c.drawRect(W/2 + 10, H/2 + 310, W/2 + 200, H/2 + 390, netBtn); c.drawRect(W/2 + 10, H/2 + 310, W/2 + 200, H/2 + 390, stroke);
+            c.drawText("Подключиться", W/2 + 105, H/2 + 365, text);
         }
     }
     

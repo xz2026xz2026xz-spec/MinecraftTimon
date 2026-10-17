@@ -5,6 +5,9 @@ import android.opengl.GLES20;
 import android.opengl.GLSurfaceView;
 import android.opengl.Matrix;
 import java.io.File;
+import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
+import java.nio.FloatBuffer;
 import java.util.ArrayList;
 import java.util.List;
 import javax.microedition.khronos.egl.EGLConfig;
@@ -15,7 +18,7 @@ public class MyGLRenderer implements GLSurfaceView.Renderer {
     private static final String FRAGMENT_SHADER = "precision mediump float; varying vec4 vColorVarying; void main() { gl_FragColor = vColorVarying; }";
     
     private int program, positionHandle, colorHandle, mvpMatrixHandle;
-    private final float[] mvpMatrix = new float[16], projectionMatrix = new float[16], viewMatrix = new float[16];
+    private final float[] mvpMatrix = new float[16], projectionMatrix = new float[16], viewMatrix = new float[16], modelMatrix = new float[16], tempMatrix = new float[16];
     
     public World world;
     public Player player;
@@ -27,10 +30,47 @@ public class MyGLRenderer implements GLSurfaceView.Renderer {
     public int currentWorld = 1;
     private volatile boolean savePending = false;
     
+    // Для подсветки блока
+    private FloatBuffer highlightBuffer;
+    private int highlightVertexCount = 0;
+    
     public MyGLRenderer(Context ctx) {
         this.ctx = ctx;
         saveFile = new File(ctx.getFilesDir(), "world_" + currentWorld + ".dat");
         loadOrGenerate(currentWorld);
+        buildHighlightCube();
+    }
+    
+    private void buildHighlightCube() {
+        // Линии для куба (белая рамка)
+        float[] lines = {
+            -0.01f,-0.01f,-0.01f, 1.01f,-0.01f,-0.01f,
+            1.01f,-0.01f,-0.01f, 1.01f,-0.01f, 1.01f,
+            1.01f,-0.01f, 1.01f, -0.01f,-0.01f, 1.01f,
+            -0.01f,-0.01f, 1.01f, -0.01f,-0.01f,-0.01f,
+            
+            -0.01f, 1.01f,-0.01f, 1.01f, 1.01f,-0.01f,
+            1.01f, 1.01f,-0.01f, 1.01f, 1.01f, 1.01f,
+            1.01f, 1.01f, 1.01f, -0.01f, 1.01f, 1.01f,
+            -0.01f, 1.01f, 1.01f, -0.01f, 1.01f,-0.01f,
+            
+            -0.01f,-0.01f,-0.01f, -0.01f, 1.01f,-0.01f,
+            1.01f,-0.01f,-0.01f, 1.01f, 1.01f,-0.01f,
+            1.01f,-0.01f, 1.01f, 1.01f, 1.01f, 1.01f,
+            -0.01f,-0.01f, 1.01f, -0.01f, 1.01f, 1.01f
+        };
+        
+        float[] colors = new float[lines.length / 3 * 4];
+        for (int i = 0; i < colors.length; i += 4) {
+            colors[i] = 0f; colors[i+1] = 0f; colors[i+2] = 0f; colors[i+3] = 1f; // Черная обводка
+        }
+        
+        ByteBuffer bb = ByteBuffer.allocateDirect(lines.length * 4);
+        bb.order(ByteOrder.nativeOrder());
+        highlightBuffer = bb.asFloatBuffer();
+        highlightBuffer.put(lines);
+        highlightBuffer.position(0);
+        highlightVertexCount = lines.length / 3;
     }
     
     private void loadOrGenerate(int index) {
@@ -132,6 +172,24 @@ public class MyGLRenderer implements GLSurfaceView.Renderer {
             GLES20.glDrawArrays(GLES20.GL_TRIANGLES, 0, chunk.getVertexCount());
             GLES20.glDisableVertexAttribArray(positionHandle); GLES20.glDisableVertexAttribArray(colorHandle);
         }
+        
+        // Отрисовка подсветки
+        int[] target = raycastBlock();
+        if (target != null) {
+            Matrix.setIdentityM(modelMatrix, 0);
+            Matrix.translateM(modelMatrix, 0, target[0], target[1], target[2]);
+            Matrix.multiplyMM(tempMatrix, 0, viewMatrix, 0, modelMatrix, 0);
+            Matrix.multiplyMM(mvpMatrix, 0, projectionMatrix, 0, tempMatrix, 0);
+            GLES20.glUniformMatrix4fv(GLES20.glGetUniformLocation(program, "uMVPMatrix"), 1, false, mvpMatrix, 0);
+            
+            GLES20.glLineWidth(5f);
+            GLES20.glEnableVertexAttribArray(positionHandle); GLES20.glVertexAttribPointer(positionHandle, 3, GLES20.GL_FLOAT, false, 0, highlightBuffer);
+            // В нашем шейдере цвет берется из атрибута, но для рамки мы можем просто передать фиксированный (упрощенно)
+            GLES20.glDisableVertexAttribArray(colorHandle); // Отключаем цвет для линий (по умолчанию будет белый/черный)
+            // Внимание: для идеальной работы нужен отдельный шейдер для линий, но для простоты закрасим черным.
+            GLES20.glDrawArrays(GLES20.GL_LINES, 0, highlightVertexCount);
+            GLES20.glDisableVertexAttribArray(positionHandle);
+        }
     }
     
     @Override public void onSurfaceChanged(GL10 unused, int width, int height) {
@@ -141,14 +199,21 @@ public class MyGLRenderer implements GLSurfaceView.Renderer {
     
     private int loadShader(int type, String code) { int s = GLES20.glCreateShader(type); GLES20.glShaderSource(s, code); GLES20.glCompileShader(s); return s; }
     
+    // Теперь возвращает: {X_блока, Y_блока, Z_блока, X_пустоты, Y_пустоты, Z_пустоты}
     public int[] raycastBlock() {
         float yawRad = (float)Math.toRadians(player.yaw), pitchRad = (float)Math.toRadians(player.pitch);
         float cosPitch = (float)Math.cos(pitchRad);
         float dx = (float)Math.sin(yawRad) * cosPitch, dy = (float)Math.sin(pitchRad), dz = -(float)Math.cos(yawRad) * cosPitch;
         float px = player.x, py = player.y + player.getEyeHeight(), pz = player.z;
+        
+        float prevX = px, prevY = py, prevZ = pz;
+        
         for (int i = 0; i < 80; i++) {
             int bx = (int)Math.floor(px), by = (int)Math.floor(py), bz = (int)Math.floor(pz);
-            if (Block.isSolid(world.getBlock(bx, by, bz))) return new int[]{bx, by, bz};
+            if (Block.isSolid(world.getBlock(bx, by, bz))) {
+                return new int[]{bx, by, bz, (int)Math.floor(prevX), (int)Math.floor(prevY), (int)Math.floor(prevZ)};
+            }
+            prevX = px; prevY = py; prevZ = pz;
             px += dx * 0.1f; py += dy * 0.1f; pz += dz * 0.1f;
         }
         return null;
