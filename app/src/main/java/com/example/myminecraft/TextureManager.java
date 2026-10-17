@@ -13,7 +13,8 @@ import java.io.FileInputStream;
 
 public class TextureManager {
     public static int atlasId = -1;
-    public static int skinTextureId = -1; // Текстура скина
+    public static int skinTextureId = -1;
+    public static boolean skinNeedsReload = false; // Текстура скина
     public static final int TILE_SIZE = 64;
     public static final int GRID_SIZE = 4; 
     public static final int ATLAS_SIZE = TILE_SIZE * GRID_SIZE;
