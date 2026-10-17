@@ -5,22 +5,19 @@ public class Player {
     public float yaw = 0f;
     public float pitch = 0f;
     public float vy = 0f;
-    
-    public byte selectedBlock = Block.GRASS;
     public boolean sneaking = false;
     
-    public static final float GRAVITY = -0.015f;
-    public static final float JUMP = 0.20f;
-    public static final float SPEED = 0.10f;
+    // Правильная физика (прыжок ~1.2 блока)
+    public static final float GRAVITY = -0.045f;
+    public static final float JUMP = 0.36f;
+    public static final float SPEED = 0.12f; 
     
     public float moveX = 0f;
     public float moveZ = 0f;
     public boolean jump = false;
     
     public Player(float x, float y, float z) {
-        this.x = x;
-        this.y = y;
-        this.z = z;
+        this.x = x; this.y = y; this.z = z;
     }
     
     public float getEyeHeight() { return sneaking ? 1.0f : 1.6f; }
@@ -31,11 +28,9 @@ public class Player {
         
         if (moveX != 0 || moveZ != 0) {
             float len = (float)Math.sqrt(moveX*moveX + moveZ*moveZ);
-            float nx = moveX / len;
-            float nz = moveZ / len;
+            float nx = moveX / len, nz = moveZ / len;
             float rad = (float)Math.toRadians(yaw);
-            float sin = (float)Math.sin(rad);
-            float cos = (float)Math.cos(rad);
+            float sin = (float)Math.sin(rad), cos = (float)Math.cos(rad);
             float dx = (nx * cos + nz * sin) * speed;
             float dz = (nx * sin - nz * cos) * speed;
             tryMove(world, dx, dz);
@@ -45,27 +40,20 @@ public class Player {
         jump = false;
         
         vy += GRAVITY;
-        if (vy < -0.5f) vy = -0.5f;
+        if (vy < -0.5f) vy = -0.5f; // Ограничение скорости падения
         float newY = y + vy;
         
         if (vy < 0) {
             int by = (int)Math.floor(newY);
             if (Block.isSolid(world.getBlock((int)Math.floor(x), by, (int)Math.floor(z)))) {
-                y = by + 1;
-                vy = 0;
-            } else {
-                y = newY;
-            }
+                y = by + 1; vy = 0;
+            } else { y = newY; }
         } else if (vy > 0) {
             int by = (int)Math.floor(newY + getHeight());
             if (Block.isSolid(world.getBlock((int)Math.floor(x), by, (int)Math.floor(z)))) {
                 vy = 0;
-            } else {
-                y = newY;
-            }
-        } else {
-            y = newY;
-        }
+            } else { y = newY; }
+        } else { y = newY; }
     }
     
     private void tryMove(World world, float dx, float dz) {
@@ -76,12 +64,13 @@ public class Player {
     }
     
     private boolean collides(World world, float px, float py, float pz) {
-        // +0.01 чтобы блок ПОД ногами не считался препятствием
-        int minX = (int)Math.floor(px - 0.25f + 0.01f);
-        int maxX = (int)Math.floor(px + 0.25f - 0.01f);
-        int minZ = (int)Math.floor(pz - 0.25f + 0.01f);
-        int maxZ = (int)Math.floor(pz + 0.25f - 0.01f);
-        int minY = (int)Math.floor(py + 0.05f);       // ← ключевое!
+        int minX = (int)Math.floor(px - 0.25f);
+        int maxX = (int)Math.floor(px + 0.25f);
+        int minZ = (int)Math.floor(pz - 0.25f);
+        int maxZ = (int)Math.floor(pz + 0.25f);
+        
+        // Отступ 0.05f защищает от застревания в полу, но позволяет заходить на блоки
+        int minY = (int)Math.floor(py + 0.05f); 
         int maxY = (int)Math.floor(py + getHeight() - 0.05f);
         
         for (int bx = minX; bx <= maxX; bx++)

@@ -18,24 +18,23 @@ public class World {
         generate(seed);
     }
     
-    public World() {
-    }
+    public World() {}
     
     private void generate(long seed) {
         Random rnd = new Random(seed);
-        
         for (int x = 0; x < SIZE_X; x++) {
             for (int z = 0; z < SIZE_Z; z++) {
+                // Сглаженная генерация (меньше ям)
                 double h = 10
-                    + 3 * Math.sin(x * 0.15)
-                    + 3 * Math.cos(z * 0.15)
-                    + 2 * Math.sin((x + z) * 0.1)
-                    + rnd.nextDouble() * 2;
+                    + 2 * Math.sin(x * 0.1)
+                    + 2 * Math.cos(z * 0.1)
+                    + 1 * Math.sin((x + z) * 0.05)
+                    + rnd.nextDouble();
                 int height = (int) h;
                 
                 for (int y = 0; y < SIZE_Y; y++) {
                     if (y == 0) blocks[x][y][z] = Block.STONE;
-                    else if (y < height - 4) blocks[x][y][z] = Block.STONE;
+                    else if (y < height - 3) blocks[x][y][z] = Block.STONE;
                     else if (y < height - 1) blocks[x][y][z] = Block.DIRT;
                     else if (y < height) blocks[x][y][z] = Block.GRASS;
                     else blocks[x][y][z] = Block.AIR;
@@ -69,15 +68,13 @@ public class World {
     }
     
     public byte getBlock(int x, int y, int z) {
-        if (x < 0 || x >= SIZE_X || y < 0 || y >= SIZE_Y || z < 0 || z >= SIZE_Z) {
-            return Block.AIR;
-        }
+        if (x < 0 || x >= SIZE_X || y < 0 || y >= SIZE_Y || z < 0 || z >= SIZE_Z) return Block.AIR;
         return blocks[x][y][z];
     }
     
     public void setBlock(int x, int y, int z, byte type) {
         if (x < 0 || x >= SIZE_X || y < 0 || y >= SIZE_Y || z < 0 || z >= SIZE_Z) return;
-        if (y == 0) return; // bedrock — не разрушается
+        if (y == 0) return;
         blocks[x][y][z] = type;
     }
     
@@ -93,41 +90,21 @@ public class World {
     public boolean saveToFile(File f, float px, float py, float pz, float yaw, float pitch) {
         try {
             DataOutputStream out = new DataOutputStream(new FileOutputStream(f));
-            out.writeInt(SIZE_X);
-            out.writeInt(SIZE_Y);
-            out.writeInt(SIZE_Z);
-            for (int x = 0; x < SIZE_X; x++)
-                for (int y = 0; y < SIZE_Y; y++)
-                    for (int z = 0; z < SIZE_Z; z++)
-                        out.writeByte(blocks[x][y][z]);
-            out.writeFloat(px);
-            out.writeFloat(py);
-            out.writeFloat(pz);
-            out.writeFloat(yaw);
-            out.writeFloat(pitch);
-            out.close();
-            return true;
+            out.writeInt(SIZE_X); out.writeInt(SIZE_Y); out.writeInt(SIZE_Z);
+            for (int x = 0; x < SIZE_X; x++) for (int y = 0; y < SIZE_Y; y++) for (int z = 0; z < SIZE_Z; z++) out.writeByte(blocks[x][y][z]);
+            out.writeFloat(px); out.writeFloat(py); out.writeFloat(pz); out.writeFloat(yaw); out.writeFloat(pitch);
+            out.close(); return true;
         } catch (Exception e) { return false; }
     }
     
     public float[] loadFromFile(File f) {
         try {
             DataInputStream in = new DataInputStream(new FileInputStream(f));
-            int sx = in.readInt();
-            int sy = in.readInt();
-            int sz = in.readInt();
+            int sx = in.readInt(); int sy = in.readInt(); int sz = in.readInt();
             if (sx != SIZE_X || sy != SIZE_Y || sz != SIZE_Z) { in.close(); return null; }
-            for (int x = 0; x < SIZE_X; x++)
-                for (int y = 0; y < SIZE_Y; y++)
-                    for (int z = 0; z < SIZE_Z; z++)
-                        blocks[x][y][z] = in.readByte();
-            float px = in.readFloat();
-            float py = in.readFloat();
-            float pz = in.readFloat();
-            float yaw = in.readFloat();
-            float pitch = in.readFloat();
-            in.close();
-            return new float[]{px, py, pz, yaw, pitch};
+            for (int x = 0; x < SIZE_X; x++) for (int y = 0; y < SIZE_Y; y++) for (int z = 0; z < SIZE_Z; z++) blocks[x][y][z] = in.readByte();
+            float px = in.readFloat(); float py = in.readFloat(); float pz = in.readFloat(); float yaw = in.readFloat(); float pitch = in.readFloat();
+            in.close(); return new float[]{px, py, pz, yaw, pitch};
         } catch (Exception e) { return null; }
     }
 }
