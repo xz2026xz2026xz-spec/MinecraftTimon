@@ -202,16 +202,15 @@ public class MainActivity extends Activity {
                 if (b != Block.AIR) {
                     renderer.world.setBlock(block[0], block[1], block[2], Block.AIR);
                     renderer.markDirty(block[0], block[1], block[2]);
-                    Inventory.addItem(b); // Добавляем в инвентарь
+                    Inventory.addItem(b);
                 }
             } else {
-                // Ставим блок, только если он есть в инвентаре
                 if (Inventory.getSelectedBlock() != Block.AIR) {
                     int bx = block[0], by = block[1] + 1, bz = block[2];
                     if (!renderer.world.isInsidePlayer(bx, by, bz, renderer.player.x, renderer.player.y, renderer.player.z)) {
                         renderer.world.setBlock(bx, by, bz, Inventory.getSelectedBlock());
                         renderer.markDirty(bx, by, bz);
-                        Inventory.removeSelected(); // Убираем 1 штуку из стака
+                        Inventory.removeSelected();
                     }
                 }
             }
@@ -222,11 +221,7 @@ public class MainActivity extends Activity {
         float scale = getUiScale();
         if (inventoryOpen) {
             if (inCircle(x, y, W - 60, 60, 45 * scale)) { inventoryOpen = false; return true; }
-            // Кнопка "Выбросить"
-            if (x > W/2 - 150 && x < W/2 + 150 && y > H - 450 && y < H - 380) {
-                Inventory.dropItem(Inventory.selectedSlot);
-                return true;
-            }
+            if (x > W/2 - 150 && x < W/2 + 150 && y > H - 450 && y < H - 380) { Inventory.dropItem(Inventory.selectedSlot); return true; }
             return false;
         }
         if (settingsOpen) {
@@ -354,29 +349,32 @@ public class MainActivity extends Activity {
             float iconSize = 45f * scale;
             text.setTextSize(iconSize);
             text.setTextAlign(Paint.Align.CENTER);
-            float hStartX = W/2f - 20 * scale - (10 * iconSize);
-            for (int i = 0; i < 10; i++) c.drawText("❤️", hStartX + i * iconSize + iconSize/2, barY, text);
-            float fStartX = W/2f + 20 * scale;
-            for (int i = 0; i < 10; i++) c.drawText("🍗", fStartX + i * iconSize + iconSize/2, barY, text);
+            
+            // Здоровье (10 сердечек)
+            float hpStartX = W/2f - 20 * scale - (10 * iconSize);
+            for (int i = 0; i < 10; i++) c.drawText("❤️", hpStartX + i * iconSize + iconSize/2, barY, text);
+            // Голод (10 ножек)
+            float foodStartX = W/2f + 20 * scale;
+            for (int i = 0; i < 10; i++) c.drawText("🍗", foodStartX + i * iconSize + iconSize/2, barY, text);
             
             int slotSize = (int)(110 * scale), hGap = (int)(10 * scale);
-            int hStartX = (W - (9 * slotSize + 8 * hGap)) / 2, hStartY = (int)(H - 140 * scale);
+            int hotbarStartX = (W - (9 * slotSize + 8 * hGap)) / 2, hotbarStartY = (int)(H - 140 * scale);
             for (int i = 0; i < 9; i++) {
-                int sx = hStartX + i * (slotSize + hGap);
+                int sx = hotbarStartX + i * (slotSize + hGap);
                 Paint p = new Paint(Paint.ANTI_ALIAS_FLAG); p.setStyle(Paint.Style.FILL);
                 p.setColor(Color.argb(i == Inventory.selectedSlot ? 220 : 100, 0, 0, 0));
-                c.drawRect(sx, hStartY, sx+slotSize, hStartY+slotSize, p);
-                c.drawRect(sx, hStartY, sx+slotSize, hStartY+slotSize, stroke);
+                c.drawRect(sx, hotbarStartY, sx+slotSize, hotbarStartY+slotSize, p);
+                c.drawRect(sx, hotbarStartY, sx+slotSize, hotbarStartY+slotSize, stroke);
                 
                 byte b = Inventory.slots[i].type;
                 if (b != Block.AIR) {
                     float[] col = Block.getUITopColor(b);
                     p.setColor(Color.rgb((int)(col[0]*255), (int)(col[1]*255), (int)(col[2]*255)));
-                    c.drawRect(sx+20, hStartY+20, sx+slotSize-20, hStartY+slotSize-20, p);
+                    c.drawRect(sx+20, hotbarStartY+20, sx+slotSize-20, hotbarStartY+slotSize-20, p);
                     
                     if (Inventory.slots[i].count > 1) {
                         text.setTextSize(30f * scale); text.setTextAlign(Paint.Align.RIGHT);
-                        c.drawText(String.valueOf(Inventory.slots[i].count), sx + slotSize - 5, hStartY + slotSize - 5, text);
+                        c.drawText(String.valueOf(Inventory.slots[i].count), sx + slotSize - 5, hotbarStartY + slotSize - 5, text);
                     }
                 }
             }
@@ -422,7 +420,6 @@ public class MainActivity extends Activity {
                 }
             }
             
-            // Кнопка "Выбросить" (внизу инвентаря)
             Paint btn = new Paint(); btn.setColor(Color.rgb(180, 60, 60));
             c.drawRect(W/2 - 150, H - 450, W/2 + 150, H - 380, btn);
             c.drawRect(W/2 - 150, H - 450, W/2 + 150, H - 380, stroke);
