@@ -315,10 +315,10 @@ public class MainActivity extends Activity {
                 startActivityForResult(intent, 100); return true;
             }
             if (x > W/2 - 200 && x < W/2 && y > H/2 + 310 && y < H/2 + 390) {
-                renderer.network.startServer(renderer.world); Toast.makeText(this, "Сервер запущен!", Toast.LENGTH_SHORT).show(); return true;
+                renderer.network.startServer(renderer.world); showServerIpDialog(); return true;
             }
             if (x > W/2 && x < W/2 + 200 && y > H/2 + 310 && y < H/2 + 390) {
-                renderer.network.connect("127.0.0.1"); Toast.makeText(this, "Подключение...", Toast.LENGTH_SHORT).show(); return true;
+                showIpDialog(); return true;
             }
             return false;
         }
@@ -557,4 +557,44 @@ public class MainActivity extends Activity {
     
     @Override protected void onPause() { super.onPause(); if (glView != null) glView.onPause(); if (renderer != null) { renderer.saveNow(); Inventory.saveToFile(this); } }
     @Override protected void onResume() { super.onResume(); if (glView != null) glView.onResume(); }
+    private void showIpDialog() {
+        AlertDialog.Builder builder = new AlertDialog.Builder(this);
+        builder.setTitle("Введите IP друга (например 192.168.1.5)");
+        final EditText input = new EditText(this);
+        builder.setView(input);
+        builder.setPositiveButton("Подключиться", (dialog, which) -> {
+            String ip = input.getText().toString().trim();
+            if (!ip.isEmpty()) {
+                renderer.network.connect(ip);
+                Toast.makeText(MainActivity.this, "Подключение к " + ip, Toast.LENGTH_SHORT).show();
+            }
+        });
+        builder.setNegativeButton("Отмена", (dialog, which) -> dialog.cancel());
+        builder.show();
+    }
+
+    private void showServerIpDialog() {
+        AlertDialog.Builder builder = new AlertDialog.Builder(this);
+        builder.setTitle("Сервер запущен!");
+        builder.setMessage("Ваш IP-адрес: " + getLocalIp() + "\n\nСкажите его другу, чтобы он подключился.");
+        builder.setPositiveButton("ОК", (dialog, which) -> dialog.dismiss());
+        builder.show();
+    }
+
+    private String getLocalIp() {
+        try {
+            java.util.Enumeration<java.net.NetworkInterface> interfaces = java.net.NetworkInterface.getNetworkInterfaces();
+            while (interfaces.hasMoreElements()) {
+                java.net.NetworkInterface iface = interfaces.nextElement();
+                if (iface.isLoopback() || !iface.isUp() || iface.isVirtual()) continue;
+                java.util.Enumeration<java.net.InetAddress> addresses = iface.getInetAddresses();
+                while (addresses.hasMoreElements()) {
+                    java.net.InetAddress addr = addresses.nextElement();
+                    String ip = addr.getHostAddress();
+                    if (ip.contains(".") && !ip.startsWith("127.")) return ip;
+                }
+            }
+        } catch (Exception e) {}
+        return "Неизвестен";
+    }
 }
