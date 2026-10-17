@@ -28,8 +28,14 @@ public class NetworkManager {
     private DataOutputStream out;
     
     public void startServer(final World world) {
+        if (isServer && isConnected) return; // Не запускаем дважды
+        
         isServer = true;
-        synchronized(playerNames) { playerNames.add(myName + " (Хост)"); }
+        synchronized(playerNames) {
+            playerNames.clear(); // Очищаем старый список
+            playerNames.add(myName + " (Хост)");
+        }
+        
         new Thread(new Runnable() {
             @Override public void run() {
                 try {
@@ -75,6 +81,17 @@ public class NetworkManager {
                 } catch (Exception e) { isConnected = false; }
             }
         }).start();
+    }
+    
+    public void updateName(String newName) {
+        this.myName = newName;
+        if (isServer && isConnected) {
+            synchronized(playerNames) {
+                playerNames.clear();
+                playerNames.add(myName + " (Хост)");
+            }
+            broadcastPlayerList();
+        }
     }
     
     private void addChatMessage(String msg) {
@@ -123,7 +140,7 @@ public class NetworkManager {
         }
     }
     
-    private void broadcastPlayerList() {
+    public void broadcastPlayerList() {
         StringBuilder sb = new StringBuilder();
         synchronized(playerNames) {
             for (String n : playerNames) sb.append(n).append(",");

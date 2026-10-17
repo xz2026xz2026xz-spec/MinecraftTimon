@@ -5,14 +5,18 @@ import java.io.DataOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Random;
 
 public class World {
-    public static final int SIZE_X = 64;
-    public static final int SIZE_Z = 64;
+    public static final int SIZE_X = 128;
+    public static final int SIZE_Z = 128;
     public static final int SIZE_Y = 32;
     
     private final byte[][][] blocks = new byte[SIZE_X][SIZE_Y][SIZE_Z];
+    public List<Sheep> sheepList = new ArrayList<>();
+    public List<Dog> dogList = new ArrayList<>();
     
     public World(long seed) { generate(seed); }
     public World() {}
@@ -21,9 +25,7 @@ public class World {
         Random rnd = new Random(seed);
         for (int x = 0; x < SIZE_X; x++) {
             for (int z = 0; z < SIZE_Z; z++) {
-                // Делаем мир плоским (высота всегда 10)
                 int height = 10;
-                
                 for (int y = 0; y < SIZE_Y; y++) {
                     if (y == 0) blocks[x][y][z] = Block.STONE;
                     else if (y < height - 3) blocks[x][y][z] = Block.STONE;
@@ -31,9 +33,24 @@ public class World {
                     else if (y < height) blocks[x][y][z] = Block.GRASS;
                     else blocks[x][y][z] = Block.AIR;
                 }
-                // Оставляем немного деревьев для красоты
                 if (rnd.nextDouble() < 0.01 && height < SIZE_Y - 6) placeTree(x, height, z);
             }
+        }
+        
+        // 15 овечек
+        sheepList.clear();
+        for (int i = 0; i < 15; i++) {
+            int sx = rnd.nextInt(SIZE_X);
+            int sz = rnd.nextInt(SIZE_Z);
+            sheepList.add(new Sheep(sx + 0.5f, 11f, sz + 0.5f));
+        }
+
+        // 5 собачек
+        dogList.clear();
+        for (int i = 0; i < 5; i++) {
+            int dx = rnd.nextInt(SIZE_X);
+            int dz = rnd.nextInt(SIZE_Z);
+            dogList.add(new Dog(dx + 0.5f, 11f, dz + 0.5f));
         }
     }
     

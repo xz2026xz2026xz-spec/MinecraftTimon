@@ -9,9 +9,14 @@ public class Player {
     public volatile boolean sprinting = false;
     public boolean thirdPerson = false;
     
-    // Гравитация стала слабее (медленное падение)
-    public static final float GRAVITY = -0.012f;
-    public static final float JUMP = 0.22f; 
+    // Здоровье и голод
+    public float health = 20.0f; // 0-20 (10 сердечек)
+    public float hunger = 20.0f; // 0-20 (10 ножек)
+    private float fallDistance = 0f;
+    private int regenTimer = 0;
+    
+    public static final float GRAVITY = -0.025f;
+    public static final float JUMP = 0.27f;
     public static final float SPEED = 0.12f; 
     
     public float moveX = 0f;
@@ -23,9 +28,18 @@ public class Player {
     public float getEyeHeight() { return sneaking ? 1.0f : 1.6f; }
     public float getHeight() { return sneaking ? 1.1f : 1.7f; }
     
+    public void respawn() {
+        x = 64f; y = 25f; z = 64f;
+        vy = 0; fallDistance = 0;
+        health = 20f; hunger = 20f;
+    }
+    
     public void update(World world) {
         float speed = sneaking ? SPEED * 0.45f : (sprinting ? SPEED * 1.5f : SPEED);
+        
+        boolean isMoving = false;
         if (moveX != 0 || moveZ != 0) {
+            isMoving = true;
             float len = (float)Math.sqrt(moveX*moveX + moveZ*moveZ);
             float nx = moveX / len, nz = moveZ / len;
             float rad = (float)Math.toRadians(yaw);
@@ -41,9 +55,44 @@ public class Player {
         }
         
         vy += GRAVITY;
-        // Ограничиваем скорость падения (медленнее падаем)
-        if (vy < -0.25f) vy = -0.25f; 
+        if (vy < -0.4f) vy = -0.4f; 
         float newY = y + vy;
+        
+        // Проверка падения (урон)
+        if (isOnGround(world)) {
+            if (fallDistance > 3.5f) { // Безопасная высота - 3.5 блока
+                health -= (fallDistance - 3.0f); // Урон от падения
+                if (health <= 0) respawn();
+            }
+            fallDistance = 0;
+        } else {
+            if (vy < 0) fallDistance -= vy; // Считаем высоту падения
+        }
+        
+        // --- ЛОГИКА ГОЛОДА ---
+        if (isMoving) {
+            hunger -= sprinting ? 0.003f : 0.001f; // Тратим голод при ходьбе/беге
+            if (hunger < 0) hunger = 0;
+        }
+        
+        // --- ЛОГИКА РЕГЕНЕРАЦИИ / ГОЛОДАНИЯ ---
+        regenTimer++;
+        if (regenTimer > 120) { // Раз в 2 секунды (при 60 FPS)
+            regenTimer = 0;
+            if (hunger >= 18.0f && health < 20.0f) {
+                health += 1.0f; // Восстанавливаем полсердечка
+                hunger -= 0.5f; // Тратим еду на реген
+            } else if (hunger <= 0 && health > 0) {
+                health -= 1.0f; // Урон от голода
+                if (health <= 0) respawn();
+            }
+        }
+        
+        // Ограничители
+        if (health > 20f) health = 20f;
+        if (hunger > 20f) hunger = 20f;
+        
+        if (y < -5) respawn();
         
         if (vy < 0) {
             int by = (int)Math.floor(newY);
@@ -56,8 +105,6 @@ public class Player {
                 vy = 0;
             } else { y = newY; }
         } else { y = newY; }
-        
-        if (y < -5) { x = 32; y = 25; z = 32; vy = 0; }
     }
     
     private void tryMove(World world, float dx, float dz) {

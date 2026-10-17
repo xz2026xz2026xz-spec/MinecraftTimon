@@ -42,7 +42,7 @@ public class MainActivity extends Activity {
     private float moveRadius = 150f;
     private float lastSwipeX, lastSwipeY;
     
-    public boolean inventoryOpen = false, settingsOpen = false;
+    public boolean inventoryOpen = false, settingsOpen = false, craftingOpen = false;
     public Bitmap skinBitmap = null;
     public Paint skinPaint = new Paint(Paint.FILTER_BITMAP_FLAG);
     
@@ -127,13 +127,11 @@ public class MainActivity extends Activity {
         builder.setPositiveButton("Сохранить", (dialog, which) -> {
             String newName = input.getText().toString().trim();
             if (!newName.isEmpty()) {
-                renderer.network.myName = newName;
+                renderer.network.updateName(newName);
                 prefs.edit().putString("nickname", newName).apply();
-                Toast.makeText(MainActivity.this, "Ник изменен", Toast.LENGTH_SHORT).show();
             }
         });
         builder.setNegativeButton("Отмена", (dialog, which) -> dialog.cancel());
-         // Запрет закрытия по клику снаружи
         builder.show();
     }
 
@@ -144,10 +142,9 @@ public class MainActivity extends Activity {
         builder.setView(input);
         builder.setPositiveButton("Подключиться", (dialog, which) -> {
             String ip = input.getText().toString().trim();
-            if (!ip.isEmpty()) { renderer.network.connect(ip); Toast.makeText(MainActivity.this, "Подключение к " + ip, Toast.LENGTH_SHORT).show(); }
+            if (!ip.isEmpty()) { renderer.network.connect(ip); }
         });
         builder.setNegativeButton("Отмена", (dialog, which) -> dialog.cancel());
-        
         builder.show();
     }
 
@@ -156,7 +153,6 @@ public class MainActivity extends Activity {
         builder.setTitle("Сервер запущен!");
         builder.setMessage("Ваш IP-адрес: " + getLocalIp() + "\n\nСкажите его другу, чтобы он подключился.");
         builder.setPositiveButton("ОК", (dialog, which) -> dialog.dismiss());
-        
         builder.show();
     }
     
@@ -198,13 +194,13 @@ public class MainActivity extends Activity {
             int pId = event.getPointerId(index);
             
             if (settingsOpen) {
-                if (handleSettingsUIDown(x, y, W, H)) {
-                    overlay.invalidate(); return true;
-                } else {
-                    isScrollingSettings = true;
-                    lastScrollY = y;
-                    return true;
-                }
+                if (handleSettingsUIDown(x, y, W, H)) { overlay.invalidate(); return true; }
+                else { isScrollingSettings = true; lastScrollY = y; return true; }
+            }
+            
+            if (craftingOpen) {
+                handleCraftingUIDown(x, y, W, H);
+                overlay.invalidate(); return true;
             }
             
             if (inventoryOpen) {
@@ -238,8 +234,7 @@ public class MainActivity extends Activity {
                 }
                 return true;
             }
-            
-            if (inventoryOpen) return true;
+            if (inventoryOpen || craftingOpen) return true;
 
             for (int i = 0; i < event.getPointerCount(); i++) {
                 int pId = event.getPointerId(i);
@@ -263,11 +258,8 @@ public class MainActivity extends Activity {
             overlay.invalidate();
         } 
         else if (action == MotionEvent.ACTION_UP || action == MotionEvent.ACTION_POINTER_UP) {
-            if (settingsOpen) {
-                isScrollingSettings = false;
-                return true;
-            }
-            if (inventoryOpen) return true;
+            if (settingsOpen) { isScrollingSettings = false; return true; }
+            if (inventoryOpen || craftingOpen) return true;
             
             int pId = event.getPointerId(index);
             if (pId == movePointerId) { movePointerId = -1; renderer.player.moveX = 0; renderer.player.moveZ = 0; }
@@ -288,17 +280,32 @@ public class MainActivity extends Activity {
     }
     
     private void doAction(boolean isBreak) {
-        int[] block = renderer.raycastBlock();
-        if (block != null) {
-            if (isBreak) {
+        if (isBreak) {
+            int sheepIdx = renderer.raycastSheep();
+            if (sheepIdx != -1) {
+                renderer.world.sheepList.remove(sheepIdx);
+                Inventory.addItem(Block.MEAT);
+                Toast.makeText(this, "Овца убита!", Toast.LENGTH_SHORT).show();
+                return;
+            }
+            
+            int[] block = renderer.raycastBlock();
+            if (block != null) {
                 byte b = renderer.world.getBlock(block[0], block[1], block[2]);
                 if (b != Block.AIR) {
                     renderer.world.setBlock(block[0], block[1], block[2], Block.AIR);
                     renderer.markDirty(block[0], block[1], block[2]);
-                    Inventory.addItem(b);
+                    if (b == Block.LEAVES && Math.random() < 0.2) {
+                        Inventory.addItem(Block.APPLE);
+                    } else {
+                        Inventory.addItem(b);
+                    }
                 }
-            } else {
-                if (Inventory.getSelectedBlock() != Block.AIR) {
+            }
+        } else {
+            if (Inventory.getSelectedBlock() != Block.AIR && !Block.isFood(Inventory.getSelectedBlock())) {
+                int[] block = renderer.raycastBlock();
+                if (block != null) {
                     int bx = block[3], by = block[4], bz = block[5];
                     if (!renderer.world.isInsidePlayer(bx, by, bz, renderer.player.x, renderer.player.y, renderer.player.z)) {
                         renderer.world.setBlock(bx, by, bz, Inventory.getSelectedBlock());
@@ -310,12 +317,95 @@ public class MainActivity extends Activity {
         }
     }
     
+    private void handleCraftingUIDown(float x, float y, int W, int H) {
+        float scale = getUiScale();
+        if (inCircle(x, y, W - 60, 60, 45 * scale)) { craftingOpen = false; inventoryOpen = true; return; }
+        
+        int slotSize = 100, gap = 10;
+        int startX = W/2 - 200, startY = H/2 - 100;
+        
+        // Сетка крафта
+        for (int i = 0; i < 4; i++) {
+            int sx = startX + (i % 2) * (slotSize + gap);
+            int sy = startY + (i / 2) * (slotSize + gap);
+            if (x >= sx && x <= sx + slotSize && y >= sy && y <= sy + slotSize) {
+                if (Inventory.movingSlot == -1) { Inventory.movingSlot = 100 + i; } // 100+ для сетки
+                else {
+                    if (Inventory.movingSlot >= 100) { // Меняем внутри сетки
+                        Inventory.Slot tmp = Inventory.craftGrid[Inventory.movingSlot - 100];
+                        Inventory.craftGrid[Inventory.movingSlot - 100] = Inventory.craftGrid[i];
+                        Inventory.craftGrid[i] = tmp;
+                    } else { // Кидаем из инвентаря
+                        Inventory.Slot tmp = Inventory.craftGrid[i];
+                        Inventory.craftGrid[i] = Inventory.slots[Inventory.movingSlot];
+                        Inventory.slots[Inventory.movingSlot] = tmp;
+                    }
+                    Inventory.movingSlot = -1;
+                }
+                Inventory.updateCraft();
+                return;
+            }
+        }
+        
+        // Слот результата
+        int outX = startX + 250, outY = startY + 55;
+        if (x >= outX && x <= outX + slotSize && y >= outY && y <= outY + slotSize) {
+            Inventory.takeCraftResult();
+            return;
+        }
+    }
+    
+    private void handleInventoryUIDown(float x, float y, int W, int H) {
+        float scale = getUiScale();
+        if (inCircle(x, y, W - 60, 60, 45 * scale)) { inventoryOpen = false; Inventory.movingSlot = -1; return; }
+        
+        // Кнопка "Крафт"
+        if (x > W/2 - 100 && x < W/2 + 100 && y > H - 350 && y < H - 280) {
+            craftingOpen = true; inventoryOpen = false; return;
+        }
+        
+        int slotSize = 100, hGap = 10;
+        int startX = (W - (9 * slotSize + 8 * hGap)) / 2, startY = 150;
+        
+        for (int row = 0; row < 3; row++) {
+            for (int i = 0; i < 9; i++) {
+                int sx = startX + i*(slotSize+hGap);
+                int sy = startY + row*(slotSize+hGap);
+                if (x >= sx && x <= sx + slotSize && y >= sy && y <= sy + slotSize) {
+                    handleSlotClick(9 + row * 9 + i); return;
+                }
+            }
+        }
+        int hotbarY = (int)(H - 200 * scale);
+        for (int i = 0; i < 9; i++) {
+            int sx = startX + i*(slotSize+hGap);
+            if (x >= sx && x <= sx + slotSize && y >= hotbarY && y <= hotbarY + slotSize) {
+                handleSlotClick(i); return;
+            }
+        }
+    }
+    
+    private void handleSlotClick(int idx) {
+        if (Inventory.movingSlot == -1) Inventory.movingSlot = idx;
+        else {
+            if (Inventory.movingSlot >= 100) {
+                Inventory.Slot tmp = Inventory.slots[idx];
+                Inventory.slots[idx] = Inventory.craftGrid[Inventory.movingSlot - 100];
+                Inventory.craftGrid[Inventory.movingSlot - 100] = tmp;
+                Inventory.updateCraft();
+            } else {
+                Inventory.swapItems(Inventory.movingSlot, idx);
+            }
+            Inventory.movingSlot = -1;
+        }
+    }
+    
     private boolean handleSettingsUIDown(float x, float y, int W, int H) {
         float scale = getUiScale();
         if (inCircle(x, y, W - 60, 60, 45 * scale)) { settingsOpen = false; return true; }
         
         float sy = y - settingsScrollY;
-        float baseY = H / 2 - 250 + 40 * scale; // Skip title
+        float baseY = H / 2 - 250 + 40 * scale;
         
         int btnSize = (int)(110 * scale);
         int gap = (int)(25 * scale);
@@ -357,30 +447,6 @@ public class MainActivity extends Activity {
         return false;
     }
     
-    private void handleInventoryUIDown(float x, float y, int W, int H) {
-        float scale = getUiScale();
-        if (inCircle(x, y, W - 60, 60, 45 * scale)) { inventoryOpen = false; Inventory.movingSlot = -1; return; }
-        int slotSize = 100, hGap = 10;
-        int startX = (W - (9 * slotSize + 8 * hGap)) / 2, startY = 150;
-        
-        for (int row = 0; row < 3; row++) {
-            for (int i = 0; i < 9; i++) {
-                int sx = startX + i*(slotSize+hGap);
-                int sy = startY + row*(slotSize+hGap);
-                if (x >= sx && x <= sx + slotSize && y >= sy && y <= sy + slotSize) {
-                    handleSlotClick(9 + row * 9 + i); return;
-                }
-            }
-        }
-        int hotbarY = (int)(H - 200 * scale);
-        for (int i = 0; i < 9; i++) {
-            int sx = startX + i*(slotSize+hGap);
-            if (x >= sx && x <= sx + slotSize && y >= hotbarY && y <= hotbarY + slotSize) {
-                handleSlotClick(i); return;
-            }
-        }
-    }
-    
     private boolean handleUIDown(float x, float y, int W, int H) {
         float scale = getUiScale();
         if (inCircle(x, y, W - 320 * scale, 60, 45 * scale)) { 
@@ -397,14 +463,19 @@ public class MainActivity extends Activity {
         int startX = (W - (9 * slotSize + 8 * gap)) / 2, startY = (int)(H - 140 * scale);
         for (int i = 0; i < 9; i++) {
             int sx = startX + i * (slotSize + gap);
-            if (x >= sx && x <= sx + slotSize && y >= startY && y <= startY + slotSize) { Inventory.selectSlot(i); return true; }
+            if (x >= sx && x <= sx + slotSize && y >= startY && y <= startY + slotSize) { 
+                if (Inventory.selectedSlot == i && Block.isFood(Inventory.slots[i].type)) {
+                    renderer.player.hunger += 6;
+                    if (renderer.player.hunger > 20) renderer.player.hunger = 20;
+                    Inventory.removeSelected();
+                    Toast.makeText(this, "Съедено!", Toast.LENGTH_SHORT).show();
+                } else {
+                    Inventory.selectSlot(i); 
+                }
+                return true; 
+            }
         }
         return false;
-    }
-    
-    private void handleSlotClick(int idx) {
-        if (Inventory.movingSlot == -1) Inventory.movingSlot = idx;
-        else { Inventory.swapItems(Inventory.movingSlot, idx); Inventory.movingSlot = -1; }
     }
     
     private boolean inCircle(float px, float py, float cx, float cy, float r) {
@@ -491,10 +562,13 @@ public class MainActivity extends Activity {
             float iconSize = 45f * scale;
             text.setTextSize(iconSize); text.setTextAlign(Paint.Align.CENTER);
             
+            int hp = (int)Math.ceil(renderer.player.health / 2.0f); 
+            int food = (int)Math.ceil(renderer.player.hunger / 2.0f); 
             float hpStartX = W/2f - 20 * scale - (10 * iconSize);
-            for (int i = 0; i < 10; i++) c.drawText("❤️", hpStartX + i * iconSize + iconSize/2, barY, text);
+            
+            for (int i = 0; i < 10; i++) c.drawText(i < hp ? "❤️" : "🖤", hpStartX + i * iconSize + iconSize/2, barY, text);
             float foodStartX = W/2f + 20 * scale;
-            for (int i = 0; i < 10; i++) c.drawText("🍗", foodStartX + i * iconSize + iconSize/2, barY, text);
+            for (int i = 0; i < 10; i++) c.drawText(i < food ? "🍗" : "🍖", foodStartX + i * iconSize + iconSize/2, barY, text);
             
             int slotSize = (int)(110 * scale), hGap = (int)(10 * scale);
             int hotbarStartX = (W - (9 * slotSize + 8 * hGap)) / 2, hotbarStartY = (int)(H - 140 * scale);
@@ -504,6 +578,7 @@ public class MainActivity extends Activity {
             }
             
             if (inventoryOpen) drawInventory(c, W, H);
+            if (craftingOpen) drawCrafting(c, W, H);
             if (settingsOpen) drawSettings(c, W, H);
         }
         
@@ -538,6 +613,38 @@ public class MainActivity extends Activity {
             }
         }
         
+        private void drawCrafting(Canvas c, int W, int H) {
+            Paint dim = new Paint(); dim.setColor(Color.argb(220, 0, 0, 0)); c.drawRect(0, 0, W, H, dim);
+            text.setTextSize(60f); text.setTextAlign(Paint.Align.CENTER); c.drawText("Крафт", W/2f, 100, text);
+            c.drawCircle(W - 60, 60, 45, bg); c.drawCircle(W - 60, 60, 45, stroke); c.drawText("X", W - 60, 75, text);
+            
+            int slotSize = 100, gap = 10;
+            int startX = W/2 - 200, startY = H/2 - 100;
+            
+            for (int i = 0; i < 4; i++) {
+                int sx = startX + (i % 2) * (slotSize + gap);
+                int sy = startY + (i / 2) * (slotSize + gap);
+                drawSlot(c, sx, sy, slotSize, Inventory.craftGrid[i], false, Inventory.movingSlot == 100 + i);
+            }
+            
+            // Стрелка
+            Paint arr = new Paint(Paint.ANTI_ALIAS_FLAG);
+            arr.setColor(Color.WHITE); arr.setStrokeWidth(6f); arr.setStyle(Paint.Style.STROKE);
+            c.drawLine(startX + 230, startY + 105, startX + 270, startY + 105, arr);
+            c.drawLine(startX + 250, startY + 85, startX + 270, startY + 105, arr);
+            c.drawLine(startX + 250, startY + 125, startX + 270, startY + 105, arr);
+            
+            // Слот результата
+            int outX = startX + 250, outY = startY + 55;
+            drawSlot(c, outX, outY, slotSize, Inventory.craftOutput, false, false);
+            
+            // Подсказка рецепта
+            text.setTextSize(35f); text.setTextAlign(Paint.Align.CENTER);
+            text.setColor(Color.LTGRAY);
+            c.drawText("Рецепт: 4 блока дерева", W/2f, H/2 + 150, text);
+            text.setColor(Color.WHITE);
+        }
+        
         private void drawInventory(Canvas c, int W, int H) {
             Paint dim = new Paint(); dim.setColor(Color.argb(220, 0, 0, 0)); c.drawRect(0, 0, W, H, dim);
             text.setTextSize(60f); text.setTextAlign(Paint.Align.CENTER); c.drawText("Инвентарь", W/2f, 100, text);
@@ -554,6 +661,12 @@ public class MainActivity extends Activity {
                     drawSlot(c, sx, sy, slotSize, Inventory.slots[idx], false, idx == Inventory.movingSlot);
                 }
             }
+            
+            // Кнопка Крафт
+            Paint btn = new Paint(); btn.setColor(Color.rgb(60, 180, 60));
+            c.drawRect(W/2 - 100, H - 350, W/2 + 100, H - 280, btn);
+            c.drawRect(W/2 - 100, H - 350, W/2 + 100, H - 280, stroke);
+            text.setTextSize(40f); c.drawText("Крафт", W/2f, H - 305, text);
             
             int hotbarY = (int)(H - 200 * getUiScale());
             for (int i = 0; i < 9; i++) {
@@ -639,19 +752,13 @@ public class MainActivity extends Activity {
     
     private String getLocalIp() {
         try {
-            java.util.Enumeration<java.net.NetworkInterface> interfaces = java.net.NetworkInterface.getNetworkInterfaces();
-            while (interfaces.hasMoreElements()) {
-                java.net.NetworkInterface iface = interfaces.nextElement();
-                if (iface.isLoopback() || !iface.isUp() || iface.isVirtual()) continue;
-                java.util.Enumeration<java.net.InetAddress> addresses = iface.getInetAddresses();
-                while (addresses.hasMoreElements()) {
-                    java.net.InetAddress addr = addresses.nextElement();
-                    String ip = addr.getHostAddress();
-                    if (ip.contains(".") && !ip.startsWith("127.")) return ip;
-                }
+            android.net.wifi.WifiManager wifiManager = (android.net.wifi.WifiManager) getApplicationContext().getSystemService(Context.WIFI_SERVICE);
+            int ipAddress = wifiManager.getConnectionInfo().getIpAddress();
+            if (ipAddress != 0) {
+                return String.format("%d.%d.%d.%d", (ipAddress & 0xff), (ipAddress >> 8 & 0xff), (ipAddress >> 16 & 0xff), (ipAddress >> 24 & 0xff));
             }
         } catch (Exception e) {}
-        return "Неизвестен";
+        return "Нет Wi-Fi (Включите Wi-Fi)";
     }
     
     @Override protected void onPause() { super.onPause(); if (glView != null) glView.onPause(); if (renderer != null) { renderer.saveNow(); Inventory.saveToFile(this); } }

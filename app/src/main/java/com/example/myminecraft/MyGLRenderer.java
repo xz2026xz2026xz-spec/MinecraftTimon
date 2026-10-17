@@ -30,47 +30,60 @@ public class MyGLRenderer implements GLSurfaceView.Renderer {
     public int currentWorld = 1;
     private volatile boolean savePending = false;
     
-    // Для подсветки блока
-    private FloatBuffer highlightBuffer;
-    private int highlightVertexCount = 0;
+    private FloatBuffer sheepVertexBuffer, sheepColorBuffer;
+    private int sheepVertexCount = 36;
+    
+    private FloatBuffer dogVertexBuffer, dogColorBuffer;
+    private int dogVertexCount = 36;
     
     public MyGLRenderer(Context ctx) {
         this.ctx = ctx;
         saveFile = new File(ctx.getFilesDir(), "world_" + currentWorld + ".dat");
         loadOrGenerate(currentWorld);
-        buildHighlightCube();
+        buildMobsMesh();
     }
     
-    private void buildHighlightCube() {
-        // Линии для куба (белая рамка)
-        float[] lines = {
-            -0.01f,-0.01f,-0.01f, 1.01f,-0.01f,-0.01f,
-            1.01f,-0.01f,-0.01f, 1.01f,-0.01f, 1.01f,
-            1.01f,-0.01f, 1.01f, -0.01f,-0.01f, 1.01f,
-            -0.01f,-0.01f, 1.01f, -0.01f,-0.01f,-0.01f,
-            
-            -0.01f, 1.01f,-0.01f, 1.01f, 1.01f,-0.01f,
-            1.01f, 1.01f,-0.01f, 1.01f, 1.01f, 1.01f,
-            1.01f, 1.01f, 1.01f, -0.01f, 1.01f, 1.01f,
-            -0.01f, 1.01f, 1.01f, -0.01f, 1.01f,-0.01f,
-            
-            -0.01f,-0.01f,-0.01f, -0.01f, 1.01f,-0.01f,
-            1.01f,-0.01f,-0.01f, 1.01f, 1.01f,-0.01f,
-            1.01f,-0.01f, 1.01f, 1.01f, 1.01f, 1.01f,
-            -0.01f,-0.01f, 1.01f, -0.01f, 1.01f, 1.01f
+    private void buildMobsMesh() {
+        float[] verts = {
+            -0.5f,-0.5f, 0.5f,  0.5f,-0.5f, 0.5f,  0.5f, 0.5f, 0.5f, -0.5f,-0.5f, 0.5f,  0.5f, 0.5f, 0.5f, -0.5f, 0.5f, 0.5f,
+             0.5f,-0.5f,-0.5f, -0.5f,-0.5f,-0.5f, -0.5f, 0.5f,-0.5f,  0.5f,-0.5f,-0.5f, -0.5f, 0.5f,-0.5f,  0.5f, 0.5f,-0.5f,
+            -0.5f, 0.5f, 0.5f,  0.5f, 0.5f, 0.5f,  0.5f, 0.5f,-0.5f, -0.5f, 0.5f, 0.5f,  0.5f, 0.5f,-0.5f, -0.5f, 0.5f,-0.5f,
+            -0.5f,-0.5f,-0.5f,  0.5f,-0.5f,-0.5f,  0.5f,-0.5f, 0.5f, -0.5f,-0.5f,-0.5f,  0.5f,-0.5f, 0.5f, -0.5f,-0.5f, 0.5f,
+             0.5f,-0.5f, 0.5f,  0.5f,-0.5f,-0.5f,  0.5f, 0.5f,-0.5f,  0.5f,-0.5f, 0.5f,  0.5f, 0.5f,-0.5f,  0.5f, 0.5f, 0.5f,
+            -0.5f,-0.5f,-0.5f, -0.5f,-0.5f, 0.5f, -0.5f, 0.5f, 0.5f, -0.5f,-0.5f,-0.5f, -0.5f, 0.5f, 0.5f, -0.5f, 0.5f,-0.5f
         };
         
-        float[] colors = new float[lines.length / 3 * 4];
-        for (int i = 0; i < colors.length; i += 4) {
-            colors[i] = 0f; colors[i+1] = 0f; colors[i+2] = 0f; colors[i+3] = 1f; // Черная обводка
-        }
+        float[] headVerts = {
+            -0.3f,-0.3f, 0.6f,  0.3f,-0.3f, 0.6f,  0.3f, 0.3f, 0.6f, -0.3f,-0.3f, 0.6f,  0.3f, 0.3f, 0.6f, -0.3f, 0.3f, 0.6f,
+            -0.3f,-0.3f, 0.5f,  0.3f,-0.3f, 0.5f,  0.3f, 0.3f, 0.5f, -0.3f,-0.3f, 0.5f,  0.3f, 0.3f, 0.5f, -0.3f, 0.3f, 0.5f
+        };
         
-        ByteBuffer bb = ByteBuffer.allocateDirect(lines.length * 4);
-        bb.order(ByteOrder.nativeOrder());
-        highlightBuffer = bb.asFloatBuffer();
-        highlightBuffer.put(lines);
-        highlightBuffer.position(0);
-        highlightVertexCount = lines.length / 3;
+        float[] combined = new float[verts.length + headVerts.length];
+        System.arraycopy(verts, 0, combined, 0, verts.length);
+        System.arraycopy(headVerts, 0, combined, verts.length, headVerts.length);
+        int totalVertexCount = combined.length / 3;
+        
+        // Овцы (белые)
+        sheepVertexCount = totalVertexCount;
+        float[] sheepColors = new float[sheepVertexCount * 3];
+        for(int i = 0; i < 36; i++) { sheepColors[i*3] = 0.95f; sheepColors[i*3+1] = 0.95f; sheepColors[i*3+2] = 0.95f; }
+        for(int i = 36; i < sheepVertexCount; i++) { sheepColors[i*3] = 0.1f; sheepColors[i*3+1] = 0.1f; sheepColors[i*3+2] = 0.1f; }
+        
+        ByteBuffer vb = ByteBuffer.allocateDirect(combined.length * 4); vb.order(ByteOrder.nativeOrder());
+        sheepVertexBuffer = vb.asFloatBuffer(); sheepVertexBuffer.put(combined); sheepVertexBuffer.position(0);
+        ByteBuffer cb = ByteBuffer.allocateDirect(sheepColors.length * 4); cb.order(ByteOrder.nativeOrder());
+        sheepColorBuffer = cb.asFloatBuffer(); sheepColorBuffer.put(sheepColors); sheepColorBuffer.position(0);
+        
+        // Собаки (коричневые)
+        dogVertexCount = totalVertexCount;
+        float[] dogColors = new float[dogVertexCount * 3];
+        for(int i = 0; i < 36; i++) { dogColors[i*3] = 0.6f; dogColors[i*3+1] = 0.4f; dogColors[i*3+2] = 0.2f; } // Тело
+        for(int i = 36; i < dogVertexCount; i++) { dogColors[i*3] = 0.3f; dogColors[i*3+1] = 0.15f; dogColors[i*3+2] = 0.05f; } // Голова
+        
+        ByteBuffer dvb = ByteBuffer.allocateDirect(combined.length * 4); dvb.order(ByteOrder.nativeOrder());
+        dogVertexBuffer = dvb.asFloatBuffer(); dogVertexBuffer.put(combined); dogVertexBuffer.position(0);
+        ByteBuffer dcb = ByteBuffer.allocateDirect(dogColors.length * 4); dcb.order(ByteOrder.nativeOrder());
+        dogColorBuffer = dcb.asFloatBuffer(); dogColorBuffer.put(dogColors); dogColorBuffer.position(0);
     }
     
     private void loadOrGenerate(int index) {
@@ -81,7 +94,7 @@ public class MyGLRenderer implements GLSurfaceView.Renderer {
             if (pos != null) { world = w; player = new Player(pos[0], pos[1], pos[2]); player.yaw = pos[3]; player.pitch = pos[4]; fixPlayerPos(); return; }
         }
         world = new World(12345L + index * 100000L);
-        player = new Player(32f, 25f, 32f);
+        player = new Player(64f, 25f, 64f);
         fixPlayerPos();
     }
     
@@ -133,6 +146,9 @@ public class MyGLRenderer implements GLSurfaceView.Renderer {
         GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT | GLES20.GL_DEPTH_BUFFER_BIT);
         player.update(world);
         
+        for (Sheep s : world.sheepList) s.update(world);
+        for (Dog d : world.dogList) d.update(world);
+        
         if (savePending) {
             savePending = false;
             final float px = player.x, py = player.y, pz = player.z, yw = player.yaw, pt = player.pitch;
@@ -173,33 +189,60 @@ public class MyGLRenderer implements GLSurfaceView.Renderer {
             GLES20.glDisableVertexAttribArray(positionHandle); GLES20.glDisableVertexAttribArray(colorHandle);
         }
         
-        // Отрисовка подсветки
-        int[] target = raycastBlock();
-        if (target != null) {
+        // Овцы
+        for (Sheep s : world.sheepList) {
             Matrix.setIdentityM(modelMatrix, 0);
-            Matrix.translateM(modelMatrix, 0, target[0], target[1], target[2]);
+            Matrix.translateM(modelMatrix, 0, s.x, s.y + 0.5f, s.z);
+            Matrix.rotateM(modelMatrix, 0, -s.yaw, 0, 1, 0);
             Matrix.multiplyMM(tempMatrix, 0, viewMatrix, 0, modelMatrix, 0);
             Matrix.multiplyMM(mvpMatrix, 0, projectionMatrix, 0, tempMatrix, 0);
             GLES20.glUniformMatrix4fv(GLES20.glGetUniformLocation(program, "uMVPMatrix"), 1, false, mvpMatrix, 0);
             
-            GLES20.glLineWidth(5f);
-            GLES20.glEnableVertexAttribArray(positionHandle); GLES20.glVertexAttribPointer(positionHandle, 3, GLES20.GL_FLOAT, false, 0, highlightBuffer);
-            // В нашем шейдере цвет берется из атрибута, но для рамки мы можем просто передать фиксированный (упрощенно)
-            GLES20.glDisableVertexAttribArray(colorHandle); // Отключаем цвет для линий (по умолчанию будет белый/черный)
-            // Внимание: для идеальной работы нужен отдельный шейдер для линий, но для простоты закрасим черным.
-            GLES20.glDrawArrays(GLES20.GL_LINES, 0, highlightVertexCount);
-            GLES20.glDisableVertexAttribArray(positionHandle);
+            GLES20.glEnableVertexAttribArray(positionHandle); GLES20.glVertexAttribPointer(positionHandle, 3, GLES20.GL_FLOAT, false, 0, sheepVertexBuffer);
+            GLES20.glEnableVertexAttribArray(colorHandle); GLES20.glVertexAttribPointer(colorHandle, 3, GLES20.GL_FLOAT, false, 0, sheepColorBuffer);
+            GLES20.glDrawArrays(GLES20.GL_TRIANGLES, 0, sheepVertexCount);
+            GLES20.glDisableVertexAttribArray(positionHandle); GLES20.glDisableVertexAttribArray(colorHandle);
+        }
+        
+        // Собаки
+        for (Dog d : world.dogList) {
+            Matrix.setIdentityM(modelMatrix, 0);
+            Matrix.translateM(modelMatrix, 0, d.x, d.y + 0.5f, d.z);
+            Matrix.rotateM(modelMatrix, 0, -d.yaw, 0, 1, 0);
+            Matrix.multiplyMM(tempMatrix, 0, viewMatrix, 0, modelMatrix, 0);
+            Matrix.multiplyMM(mvpMatrix, 0, projectionMatrix, 0, tempMatrix, 0);
+            GLES20.glUniformMatrix4fv(GLES20.glGetUniformLocation(program, "uMVPMatrix"), 1, false, mvpMatrix, 0);
+            
+            GLES20.glEnableVertexAttribArray(positionHandle); GLES20.glVertexAttribPointer(positionHandle, 3, GLES20.GL_FLOAT, false, 0, dogVertexBuffer);
+            GLES20.glEnableVertexAttribArray(colorHandle); GLES20.glVertexAttribPointer(colorHandle, 3, GLES20.GL_FLOAT, false, 0, dogColorBuffer);
+            GLES20.glDrawArrays(GLES20.GL_TRIANGLES, 0, dogVertexCount);
+            GLES20.glDisableVertexAttribArray(positionHandle); GLES20.glDisableVertexAttribArray(colorHandle);
         }
     }
     
     @Override public void onSurfaceChanged(GL10 unused, int width, int height) {
         GLES20.glViewport(0, 0, width, height);
-        Matrix.perspectiveM(projectionMatrix, 0, 70f, (float) width / height, 0.05f, 300f);
+        Matrix.perspectiveM(projectionMatrix, 0, 70f, (float) width / height, 0.05f, 400f);
     }
     
     private int loadShader(int type, String code) { int s = GLES20.glCreateShader(type); GLES20.glShaderSource(s, code); GLES20.glCompileShader(s); return s; }
     
-    // Теперь возвращает: {X_блока, Y_блока, Z_блока, X_пустоты, Y_пустоты, Z_пустоты}
+    public int raycastSheep() {
+        float yawRad = (float)Math.toRadians(player.yaw), pitchRad = (float)Math.toRadians(player.pitch);
+        float cosPitch = (float)Math.cos(pitchRad);
+        float dx = (float)Math.sin(yawRad) * cosPitch, dy = (float)Math.sin(pitchRad), dz = -(float)Math.cos(yawRad) * cosPitch;
+        float px = player.x, py = player.y + player.getEyeHeight(), pz = player.z;
+        for (int i = 0; i < 40; i++) {
+            for (int j = 0; j < world.sheepList.size(); j++) {
+                Sheep s = world.sheepList.get(j);
+                float ddx = px - s.x, ddy = py - (s.y + 0.5f), ddz = pz - s.z;
+                if (ddx*ddx + ddy*ddy + ddz*ddz < 0.8f) return j;
+            }
+            px += dx * 0.1f; py += dy * 0.1f; pz += dz * 0.1f;
+        }
+        return -1;
+    }
+
     public int[] raycastBlock() {
         float yawRad = (float)Math.toRadians(player.yaw), pitchRad = (float)Math.toRadians(player.pitch);
         float cosPitch = (float)Math.cos(pitchRad);
