@@ -240,7 +240,7 @@ public class MainActivity extends Activity {
                 }
             }
             // Клики по хотбару внутри инвентаря
-            int hotbarY = H - 350 * scale;
+            int hotbarY = (int)(H - 350 * scale);
             for (int i = 0; i < 9; i++) {
                 int sx = startX + i*(slotSize+hGap);
                 if (x >= sx && x <= sx + slotSize && y >= hotbarY && y <= hotbarY + slotSize) {
@@ -456,7 +456,7 @@ public class MainActivity extends Activity {
                 }
             }
             // Хотбар
-            int hotbarY = H - 350 * (int)getUiScale();
+            int hotbarY = (int)(H - 350 * getUiScale());
             for (int i = 0; i < 9; i++) {
                 int sx = startX + i*(slotSize+hGap);
                 drawSlot(c, sx, hotbarY, slotSize, Inventory.slots[i], i == Inventory.selectedSlot, i == Inventory.movingSlot);
