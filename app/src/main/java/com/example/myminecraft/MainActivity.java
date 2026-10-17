@@ -57,7 +57,7 @@ public class MainActivity extends Activity {
         getWindow().setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_NOTHING);
         loadSkin();
         
-        prefs = getSharedPreferences("TimonCraftPrefs", Context.MODE_PRIVATE);
+        prefs = getSharedPreferences("TimonCraftPrefs", Context.MODE_PRIVATE); Inventory.loadFromFile(this);
         
         renderer = new MyGLRenderer(this);
         // Загружаем сохраненный ник
@@ -555,6 +555,6 @@ public class MainActivity extends Activity {
         }
     }
     
-    @Override protected void onPause() { super.onPause(); if (glView != null) glView.onPause(); if (renderer != null) renderer.saveNow(); }
+    @Override protected void onPause() { super.onPause(); if (glView != null) glView.onPause(); if (renderer != null) { renderer.saveNow(); Inventory.saveToFile(this); } }
     @Override protected void onResume() { super.onResume(); if (glView != null) glView.onResume(); }
 }
