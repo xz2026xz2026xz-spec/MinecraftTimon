@@ -50,6 +50,11 @@ public class MainActivity extends Activity {
     public int uiSizeMode = 1; 
     public float getUiScale() { return uiSizeMode == 0 ? 0.8f : (uiSizeMode == 2 ? 1.2f : 1.0f); }
     
+    // Для прокрутки настроек
+    private float settingsScrollY = 0f;
+    private float settingsStartScrollY = 0f;
+    private boolean isScrollingSettings = false;
+    
     @Override protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         requestWindowFeature(Window.FEATURE_NO_TITLE);
@@ -57,10 +62,10 @@ public class MainActivity extends Activity {
         getWindow().setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_NOTHING);
         loadSkin();
         
-        prefs = getSharedPreferences("TimonCraftPrefs", Context.MODE_PRIVATE); Inventory.loadFromFile(this);
+        prefs = getSharedPreferences("TimonCraftPrefs", Context.MODE_PRIVATE);
+        Inventory.loadFromFile(this);
         
         renderer = new MyGLRenderer(this);
-        // Загружаем сохраненный ник
         String savedName = prefs.getString("nickname", null);
         if (savedName != null && !savedName.isEmpty()) {
             renderer.network.myName = savedName;
@@ -117,31 +122,39 @@ public class MainActivity extends Activity {
     private void showNicknameDialog() {
         AlertDialog.Builder builder = new AlertDialog.Builder(this);
         builder.setTitle("Введите ваш никнейм");
-        
         final EditText input = new EditText(this);
         input.setText(renderer.network.myName);
         builder.setView(input);
-        
         builder.setPositiveButton("Сохранить", (dialog, which) -> {
             String newName = input.getText().toString().trim();
             if (!newName.isEmpty()) {
                 renderer.network.myName = newName;
                 prefs.edit().putString("nickname", newName).apply();
-                Toast.makeText(MainActivity.this, "Ник изменен на " + newName, Toast.LENGTH_SHORT).show();
-                // Обновляем список игроков, если мы на сервере
-                if (renderer.network.isConnected) {
-                    synchronized(renderer.network.playerNames) {
-                        if (renderer.network.isServer) {
-                            // Если мы хост, просто меняем имя
-                            if (renderer.network.playerNames.size() > 0) {
-                                renderer.network.playerNames.set(0, newName + " (Хост)");
-                            }
-                        }
-                    }
-                }
+                Toast.makeText(MainActivity.this, "Ник изменен", Toast.LENGTH_SHORT).show();
             }
         });
         builder.setNegativeButton("Отмена", (dialog, which) -> dialog.cancel());
+        builder.show();
+    }
+
+    private void showIpDialog() {
+        AlertDialog.Builder builder = new AlertDialog.Builder(this);
+        builder.setTitle("Введите IP друга (например 192.168.1.5)");
+        final EditText input = new EditText(this);
+        builder.setView(input);
+        builder.setPositiveButton("Подключиться", (dialog, which) -> {
+            String ip = input.getText().toString().trim();
+            if (!ip.isEmpty()) { renderer.network.connect(ip); Toast.makeText(MainActivity.this, "Подключение к " + ip, Toast.LENGTH_SHORT).show(); }
+        });
+        builder.setNegativeButton("Отмена", (dialog, which) -> dialog.cancel());
+        builder.show();
+    }
+
+    private void showServerIpDialog() {
+        AlertDialog.Builder builder = new AlertDialog.Builder(this);
+        builder.setTitle("Сервер запущен!");
+        builder.setMessage("Ваш IP-адрес: " + getLocalIp() + "\n\nСкажите его другу, чтобы он подключился.");
+        builder.setPositiveButton("ОК", (dialog, which) -> dialog.dismiss());
         builder.show();
     }
     
@@ -182,8 +195,16 @@ public class MainActivity extends Activity {
             float x = event.getX(index), y = event.getY(index);
             int pId = event.getPointerId(index);
             
+            if (settingsOpen) {
+                settingsStartScrollY = y;
+                isScrollingSettings = false;
+                // Закрытие настроек работает сразу
+                if (inCircle(x, y, W - 60, 60, 45 * scale)) { settingsOpen = false; return true; }
+                return true;
+            }
+            
             if (handleUIDown(x, y, W, H)) { overlay.invalidate(); return true; }
-            if (inventoryOpen || settingsOpen || chatInput.getVisibility() == View.VISIBLE) return true;
+            if (inventoryOpen || chatInput.getVisibility() == View.VISIBLE) return true;
             
             boolean isJoySide = leftHanded ? (x > W / 2) : (x < W / 2);
             if (isJoySide && movePointerId == -1) { movePointerId = pId; knobX = x; knobY = y; } 
@@ -197,6 +218,19 @@ public class MainActivity extends Activity {
             overlay.invalidate();
         } 
         else if (action == MotionEvent.ACTION_MOVE) {
+            if (settingsOpen) {
+                float dy = event.getY(index) - settingsStartScrollY;
+                if (Math.abs(dy) > 15) {
+                    isScrollingSettings = true;
+                    settingsScrollY += dy;
+                    if (settingsScrollY > 0) settingsScrollY = 0;
+                    if (settingsScrollY < -300 * scale) settingsScrollY = -300 * scale;
+                    settingsStartScrollY = event.getY(index);
+                }
+                overlay.invalidate();
+                return true;
+            }
+
             for (int i = 0; i < event.getPointerCount(); i++) {
                 int pId = event.getPointerId(i);
                 float x = event.getX(i), y = event.getY(i);
@@ -219,6 +253,13 @@ public class MainActivity extends Activity {
             overlay.invalidate();
         } 
         else if (action == MotionEvent.ACTION_UP || action == MotionEvent.ACTION_POINTER_UP) {
+            if (settingsOpen) {
+                if (!isScrollingSettings) {
+                    handleUIDown(event.getX(index), event.getY(index), W, H);
+                }
+                return true;
+            }
+            
             int pId = event.getPointerId(index);
             if (pId == movePointerId) { movePointerId = -1; renderer.player.moveX = 0; renderer.player.moveZ = 0; }
             else if (pId == lookPointerId) lookPointerId = -1;
@@ -258,101 +299,6 @@ public class MainActivity extends Activity {
                 }
             }
         }
-    }
-    
-    private boolean handleUIDown(float x, float y, int W, int H) {
-        float scale = getUiScale();
-        
-        if (inventoryOpen) {
-            if (inCircle(x, y, W - 60, 60, 45 * scale)) { inventoryOpen = false; Inventory.movingSlot = -1; return true; }
-            
-            int slotSize = 100, hGap = 10;
-            int startX = (W - (9 * slotSize + 8 * hGap)) / 2, startY = 150;
-            for (int row = 0; row < 3; row++) {
-                for (int i = 0; i < 9; i++) {
-                    int sx = startX + i*(slotSize+hGap);
-                    int sy = startY + row*(slotSize+hGap);
-                    if (x >= sx && x <= sx + slotSize && y >= sy && y <= sy + slotSize) {
-                        int idx = 9 + row * 9 + i;
-                        handleSlotClick(idx);
-                        return true;
-                    }
-                }
-            }
-            int hotbarY = H - 200 * (int)scale;
-            for (int i = 0; i < 9; i++) {
-                int sx = startX + i*(slotSize+hGap);
-                if (x >= sx && x <= sx + slotSize && y >= hotbarY && y <= hotbarY + slotSize) {
-                    handleSlotClick(i);
-                    return true;
-                }
-            }
-            return false;
-        }
-        
-        if (settingsOpen) {
-            if (inCircle(x, y, W - 60, 60, 45 * scale)) { settingsOpen = false; return true; }
-            int btnSize = (int)(110 * scale), gap = (int)(25 * scale);
-            int totalW = 5 * btnSize + 4 * gap;
-            int startX = (W - totalW) / 2, startY = H / 2 - 250;
-            for (int i = 0; i < 5; i++) {
-                int bx = startX + i * (btnSize + gap);
-                if (x >= bx && x <= bx + btnSize && y >= startY && y <= startY + btnSize) {
-                    if (renderer.currentWorld != i + 1) { renderer.requestSwitchWorld(i + 1); }
-                    settingsOpen = false; return true;
-                }
-            }
-            
-            // Кнопка Сменить ник (Новая!)
-            if (x > W/2 - 200 && x < W/2 + 200 && y > H/2 - 100 && y < H/2 - 20) {
-                showNicknameDialog(); return true;
-            }
-            
-            if (x > W/2 - 200 && x < W/2 + 200 && y > H/2 + 10 && y < H/2 + 90) { leftHanded = !leftHanded; return true; }
-            if (x > W/2 - 200 && x < W/2 + 200 && y > H/2 + 110 && y < H/2 + 190) { uiSizeMode = (uiSizeMode + 1) % 3; return true; }
-            if (x > W/2 - 200 && x < W/2 + 200 && y > H/2 + 210 && y < H/2 + 290) {
-                Intent intent = new Intent(Intent.ACTION_PICK); intent.setType("image/*");
-                startActivityForResult(intent, 100); return true;
-            }
-            if (x > W/2 - 200 && x < W/2 && y > H/2 + 310 && y < H/2 + 390) {
-                renderer.network.startServer(renderer.world); showServerIpDialog(); return true;
-            }
-            if (x > W/2 && x < W/2 + 200 && y > H/2 + 310 && y < H/2 + 390) {
-                showIpDialog(); return true;
-            }
-            return false;
-        }
-        
-        if (inCircle(x, y, W - 320 * scale, 60, 45 * scale)) { 
-            chatInput.setVisibility(View.VISIBLE); chatInput.requestFocus();
-            InputMethodManager imm = (InputMethodManager) getSystemService(Context.INPUT_METHOD_SERVICE);
-            imm.showSoftInput(chatInput, InputMethodManager.SHOW_IMPLICIT);
-            return true; 
-        }
-        if (inCircle(x, y, W - 230 * scale, 60, 45 * scale)) { renderer.player.thirdPerson = !renderer.player.thirdPerson; return true; }
-        if (inCircle(x, y, W - 140 * scale, 60, 45 * scale)) { inventoryOpen = true; return true; }
-        if (inCircle(x, y, W - 50 * scale, 60, 45 * scale)) { settingsOpen = true; return true; }
-        
-        int slotSize = (int)(110 * scale), gap = (int)(10 * scale);
-        int startX = (W - (9 * slotSize + 8 * gap)) / 2, startY = (int)(H - 140 * scale);
-        for (int i = 0; i < 9; i++) {
-            int sx = startX + i * (slotSize + gap);
-            if (x >= sx && x <= sx + slotSize && y >= startY && y <= startY + slotSize) { Inventory.selectSlot(i); return true; }
-        }
-        return false;
-    }
-    
-    private void handleSlotClick(int idx) {
-        if (Inventory.movingSlot == -1) {
-            Inventory.movingSlot = idx;
-        } else {
-            Inventory.swapItems(Inventory.movingSlot, idx);
-            Inventory.movingSlot = -1;
-        }
-    }
-    
-    private boolean inCircle(float px, float py, float cx, float cy, float r) {
-        float dx = px - cx, dy = py - cy; return dx*dx + dy*dy <= r*r;
     }
     
     private class OverlayView extends View {
@@ -489,6 +435,8 @@ public class MainActivity extends Activity {
             
             int slotSize = 100, hGap = 10;
             int startX = (W - (9 * slotSize + 8 * hGap)) / 2, startY = 150;
+            
+            // Рюкзак (3x9)
             for (int row = 0; row < 3; row++) {
                 for (int i = 0; i < 9; i++) {
                     int sx = startX + i*(slotSize+hGap);
@@ -497,7 +445,9 @@ public class MainActivity extends Activity {
                     drawSlot(c, sx, sy, slotSize, Inventory.slots[idx], false, idx == Inventory.movingSlot);
                 }
             }
-            int hotbarY = H - 200 * (int)getUiScale();
+            
+            // Хотбар (внизу инвентаря)
+            int hotbarY = (int)(H - 200 * getUiScale());
             for (int i = 0; i < 9; i++) {
                 int sx = startX + i*(slotSize+hGap);
                 drawSlot(c, sx, hotbarY, slotSize, Inventory.slots[i], i == Inventory.selectedSlot, i == Inventory.movingSlot);
@@ -512,10 +462,12 @@ public class MainActivity extends Activity {
             text.setTextSize(60f); text.setTextAlign(Paint.Align.CENTER); c.drawText("Настройки", W/2f, 80, text);
             c.drawCircle(W - 60, 60, 45, bg); c.drawCircle(W - 60, 60, 45, stroke); c.drawText("X", W - 60, 75, text);
             
-            text.setTextSize(40f); c.drawText("Выбор мира:", W/2f, H/2 - 250, text);
+            float baseY = H / 2 - 250 + settingsScrollY;
+            
+            text.setTextSize(40f); c.drawText("Выбор мира:", W/2f, baseY, text);
             int btnSize = 110, gap = 25;
             int totalW = 5 * btnSize + 4 * gap;
-            int startX = (W - totalW) / 2, startY = H / 2 - 250 + 40;
+            int startX = (W - totalW) / 2, startY = (int)baseY + 40;
             for (int i = 0; i < 5; i++) {
                 int bx = startX + i * (btnSize + gap);
                 boolean exists = renderer.worldExists(i + 1);
@@ -529,58 +481,37 @@ public class MainActivity extends Activity {
             
             Paint btnBg = new Paint(); btnBg.setColor(Color.rgb(80, 130, 200));
             
-            // Кнопка Сменить Ник (Новая!)
-            c.drawRect(W/2 - 200, H/2 - 100, W/2 + 200, H/2 - 20, btnBg); c.drawRect(W/2 - 200, H/2 - 100, W/2 + 200, H/2 - 20, stroke);
-            text.setTextSize(40f); c.drawText("Сменить ник", W/2f, H/2 - 55, text);
+            c.drawRect(W/2 - 200, baseY + 160, W/2 + 200, baseY + 240, btnBg); c.drawRect(W/2 - 200, baseY + 160, W/2 + 200, baseY + 240, stroke);
+            text.setTextSize(40f); c.drawText("Сменить ник", W/2f, baseY + 215, text);
             
-            text.setTextSize(36f); c.drawText("Раскладка", W/2f, H/2 + 40, text);
-            c.drawRect(W/2 - 200, H/2 + 10, W/2 + 200, H/2 + 90, btnBg); c.drawRect(W/2 - 200, H/2 + 10, W/2 + 200, H/2 + 90, stroke);
-            text.setTextSize(40f); c.drawText(leftHanded ? "Левша" : "Правша", W/2f, H/2 + 65, text);
+            text.setTextSize(36f); c.drawText("Раскладка", W/2f, baseY + 290, text);
+            c.drawRect(W/2 - 200, baseY + 260, W/2 + 200, baseY + 340, btnBg); c.drawRect(W/2 - 200, baseY + 260, W/2 + 200, baseY + 340, stroke);
+            text.setTextSize(40f); c.drawText(leftHanded ? "Левша" : "Правша", W/2f, baseY + 315, text);
             
-            text.setTextSize(36f); c.drawText("Размер", W/2f, H/2 + 140, text);
-            c.drawRect(W/2 - 200, H/2 + 110, W/2 + 200, H/2 + 190, btnBg); c.drawRect(W/2 - 200, H/2 + 110, W/2 + 200, H/2 + 190, stroke);
-            text.setTextSize(40f); c.drawText(uiSizeMode == 0 ? "Маленький" : (uiSizeMode == 2 ? "Большой" : "Средний"), W/2f, H/2 + 165, text);
+            text.setTextSize(36f); c.drawText("Размер", W/2f, baseY + 390, text);
+            c.drawRect(W/2 - 200, baseY + 360, W/2 + 200, baseY + 440, btnBg); c.drawRect(W/2 - 200, baseY + 360, W/2 + 200, baseY + 440, stroke);
+            text.setTextSize(40f); c.drawText(uiSizeMode == 0 ? "Маленький" : (uiSizeMode == 2 ? "Большой" : "Средний"), W/2f, baseY + 415, text);
             
-            text.setTextSize(36f); c.drawText("Скин", W/2f, H/2 + 240, text);
-            c.drawRect(W/2 - 200, H/2 + 210, W/2 + 200, H/2 + 290, btnBg); c.drawRect(W/2 - 200, H/2 + 210, W/2 + 200, H/2 + 290, stroke);
-            text.setTextSize(40f); c.drawText("Загрузить", W/2f, H/2 + 265, text);
+            text.setTextSize(36f); c.drawText("Скин", W/2f, baseY + 490, text);
+            c.drawRect(W/2 - 200, baseY + 460, W/2 + 200, baseY + 540, btnBg); c.drawRect(W/2 - 200, baseY + 460, W/2 + 200, baseY + 540, stroke);
+            text.setTextSize(40f); c.drawText("Загрузить", W/2f, baseY + 515, text);
             
             Paint netBtn = new Paint(); netBtn.setColor(Color.rgb(60, 180, 60));
-            c.drawRect(W/2 - 200, H/2 + 310, W/2 - 10, H/2 + 390, netBtn); c.drawRect(W/2 - 200, H/2 + 310, W/2 - 10, H/2 + 390, stroke);
-            text.setTextSize(36f); c.drawText("Открыть мир", W/2 - 105, H/2 + 365, text);
+            c.drawRect(W/2 - 200, baseY + 560, W/2 - 10, baseY + 640, netBtn); c.drawRect(W/2 - 200, baseY + 560, W/2 - 10, baseY + 640, stroke);
+            text.setTextSize(36f); c.drawText("Открыть мир", W/2 - 105, baseY + 615, text);
             
             netBtn.setColor(Color.rgb(180, 60, 60));
-            c.drawRect(W/2 + 10, H/2 + 310, W/2 + 200, H/2 + 390, netBtn); c.drawRect(W/2 + 10, H/2 + 310, W/2 + 200, H/2 + 390, stroke);
-            c.drawText("Подключиться", W/2 + 105, H/2 + 365, text);
+            c.drawRect(W/2 + 10, baseY + 560, W/2 + 200, baseY + 640, netBtn); c.drawRect(W/2 + 10, baseY + 560, W/2 + 200, baseY + 640, stroke);
+            c.drawText("Подключиться", W/2 + 105, baseY + 615, text);
+            
+            if (settingsScrollY < 0) {
+                text.setTextSize(30f); text.setTextAlign(Paint.Align.CENTER); text.setColor(Color.LTGRAY);
+                c.drawText("↑ Прокрутите вниз ↑", W/2f, H - 40, text);
+                text.setColor(Color.WHITE);
+            }
         }
     }
     
-    @Override protected void onPause() { super.onPause(); if (glView != null) glView.onPause(); if (renderer != null) { renderer.saveNow(); Inventory.saveToFile(this); } }
-    @Override protected void onResume() { super.onResume(); if (glView != null) glView.onResume(); }
-    private void showIpDialog() {
-        AlertDialog.Builder builder = new AlertDialog.Builder(this);
-        builder.setTitle("Введите IP друга (например 192.168.1.5)");
-        final EditText input = new EditText(this);
-        builder.setView(input);
-        builder.setPositiveButton("Подключиться", (dialog, which) -> {
-            String ip = input.getText().toString().trim();
-            if (!ip.isEmpty()) {
-                renderer.network.connect(ip);
-                Toast.makeText(MainActivity.this, "Подключение к " + ip, Toast.LENGTH_SHORT).show();
-            }
-        });
-        builder.setNegativeButton("Отмена", (dialog, which) -> dialog.cancel());
-        builder.show();
-    }
-
-    private void showServerIpDialog() {
-        AlertDialog.Builder builder = new AlertDialog.Builder(this);
-        builder.setTitle("Сервер запущен!");
-        builder.setMessage("Ваш IP-адрес: " + getLocalIp() + "\n\nСкажите его другу, чтобы он подключился.");
-        builder.setPositiveButton("ОК", (dialog, which) -> dialog.dismiss());
-        builder.show();
-    }
-
     private String getLocalIp() {
         try {
             java.util.Enumeration<java.net.NetworkInterface> interfaces = java.net.NetworkInterface.getNetworkInterfaces();
@@ -597,4 +528,7 @@ public class MainActivity extends Activity {
         } catch (Exception e) {}
         return "Неизвестен";
     }
+    
+    @Override protected void onPause() { super.onPause(); if (glView != null) glView.onPause(); if (renderer != null) { renderer.saveNow(); Inventory.saveToFile(this); } }
+    @Override protected void onResume() { super.onResume(); if (glView != null) glView.onResume(); }
 }
