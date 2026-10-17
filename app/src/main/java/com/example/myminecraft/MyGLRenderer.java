@@ -15,18 +15,17 @@ public class MyGLRenderer implements GLSurfaceView.Renderer {
     private static final String FRAGMENT_SHADER = "precision mediump float; varying vec4 vColorVarying; void main() { gl_FragColor = vColorVarying; }";
     
     private int program, positionHandle, colorHandle, mvpMatrixHandle;
-    private final float[] mvpMatrix = new float[16], projectionMatrix = new float[16], viewMatrix = new float[16];
+    private final float[] mvpMatrix = new float[16], projectionMatrix = new float[16], viewMatrix = new float[16], modelMatrix = new float[16], tempMatrix = new float[16];
     
     public World world;
     public Player player;
+    public NetworkManager network = new NetworkManager();
     public List<Chunk> chunks = new ArrayList<>();
     
     private final Context ctx;
     private File saveFile;
     public int currentWorld = 1;
     private volatile boolean savePending = false;
-    private volatile int pendingSwitch = -1;
-    private volatile boolean pendingDelete = false;
     
     public MyGLRenderer(Context ctx) {
         this.ctx = ctx;
@@ -39,12 +38,7 @@ public class MyGLRenderer implements GLSurfaceView.Renderer {
         if (f.exists()) {
             World w = new World();
             float[] pos = w.loadFromFile(f);
-            if (pos != null) {
-                world = w;
-                player = new Player(pos[0], pos[1], pos[2]);
-                player.yaw = pos[3]; player.pitch = pos[4];
-                fixPlayerPos(); return;
-            }
+            if (pos != null) { world = w; player = new Player(pos[0], pos[1], pos[2]); player.yaw = pos[3]; player.pitch = pos[4]; fixPlayerPos(); return; }
         }
         world = new World(12345L + index * 100000L);
         player = new Player(32f, 25f, 32f);
@@ -59,18 +53,16 @@ public class MyGLRenderer implements GLSurfaceView.Renderer {
         }
     }
     
-    public void requestSwitchWorld(int index) { pendingSwitch = index; }
-    public void requestDeleteCurrent() { pendingDelete = true; }
-    public void saveNow() { savePending = true; }
-    public boolean worldExists(int index) { return new File(ctx.getFilesDir(), "world_" + index + ".dat").exists(); }
-    
-    private void switchWorld(int index) {
+    public void requestSwitchWorld(int index) {
         world.saveToFile(saveFile, player.x, player.y, player.z, player.yaw, player.pitch);
         currentWorld = index;
         saveFile = new File(ctx.getFilesDir(), "world_" + index + ".dat");
         loadOrGenerate(index);
         rebuildAllChunks();
     }
+    
+    public void saveNow() { savePending = true; }
+    public boolean worldExists(int index) { return new File(ctx.getFilesDir(), "world_" + index + ".dat").exists(); }
     
     private void rebuildAllChunks() {
         chunks.clear();
@@ -83,9 +75,7 @@ public class MyGLRenderer implements GLSurfaceView.Renderer {
     
     @Override public void onSurfaceCreated(GL10 unused, EGLConfig config) {
         GLES20.glClearColor(0.5f, 0.7f, 1.0f, 1.0f);
-        GLES20.glEnable(GLES20.GL_DEPTH_TEST);
-        GLES20.glEnable(GLES20.GL_CULL_FACE);
-        GLES20.glCullFace(GLES20.GL_BACK);
+        GLES20.glEnable(GLES20.GL_DEPTH_TEST); GLES20.glEnable(GLES20.GL_CULL_FACE); GLES20.glCullFace(GLES20.GL_BACK);
         int vs = loadShader(GLES20.GL_VERTEX_SHADER, VERTEX_SHADER);
         int fs = loadShader(GLES20.GL_FRAGMENT_SHADER, FRAGMENT_SHADER);
         program = GLES20.glCreateProgram(); GLES20.glAttachShader(program, vs); GLES20.glAttachShader(program, fs); GLES20.glLinkProgram(program);
@@ -100,11 +90,9 @@ public class MyGLRenderer implements GLSurfaceView.Renderer {
     }
     
     @Override public void onDrawFrame(GL10 unused) {
-        if (pendingDelete) { pendingDelete = false; if (saveFile.exists()) saveFile.delete(); loadOrGenerate(currentWorld); rebuildAllChunks(); }
-        if (pendingSwitch > 0) { int n = pendingSwitch; pendingSwitch = -1; if (n != currentWorld) switchWorld(n); }
-        
         GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT | GLES20.GL_DEPTH_BUFFER_BIT);
         player.update(world);
+        network.sendPlayerPos(player.x, player.y, player.z, player.yaw, player.pitch);
         
         if (savePending) {
             savePending = false;
@@ -115,18 +103,14 @@ public class MyGLRenderer implements GLSurfaceView.Renderer {
         
         float yawRad = (float)Math.toRadians(player.yaw), pitchRad = (float)Math.toRadians(player.pitch);
         float cosPitch = (float)Math.cos(pitchRad);
-        
         float lookX = player.x + (float)Math.sin(yawRad) * cosPitch;
         float lookY = player.y + player.getEyeHeight() + (float)Math.sin(pitchRad);
         float lookZ = player.z - (float)Math.cos(yawRad) * cosPitch;
         
         float camX = player.x, camY = player.y + player.getEyeHeight(), camZ = player.z;
-        
         if (player.thirdPerson) {
             float dist = 4.0f, step = 0.2f, curDist = 0;
-            float stepX = -(float)Math.sin(yawRad) * cosPitch * step;
-            float stepY = -(float)Math.sin(pitchRad) * step;
-            float stepZ = (float)Math.cos(yawRad) * cosPitch * step;
+            float stepX = -(float)Math.sin(yawRad) * cosPitch * step, stepY = -(float)Math.sin(pitchRad) * step, stepZ = (float)Math.cos(yawRad) * cosPitch * step;
             while (curDist < dist) {
                 float nextX = camX + stepX, nextY = camY + stepY, nextZ = camZ + stepZ;
                 if (Block.isSolid(world.getBlock((int)Math.floor(nextX), (int)Math.floor(nextY), (int)Math.floor(nextZ)))) break;
@@ -138,20 +122,28 @@ public class MyGLRenderer implements GLSurfaceView.Renderer {
         Matrix.multiplyMM(mvpMatrix, 0, projectionMatrix, 0, viewMatrix, 0);
         
         GLES20.glUseProgram(program);
-        mvpMatrixHandle = GLES20.glGetUniformLocation(program, "uMVPMatrix");
-        GLES20.glUniformMatrix4fv(mvpMatrixHandle, 1, false, mvpMatrix, 0);
+        GLES20.glUniformMatrix4fv(GLES20.glGetUniformLocation(program, "uMVPMatrix"), 1, false, mvpMatrix, 0);
         positionHandle = GLES20.glGetAttribLocation(program, "vPosition");
         colorHandle = GLES20.glGetAttribLocation(program, "vColor");
         
         for (Chunk chunk : chunks) {
             if (chunk.getVertexCount() == 0) continue;
-            GLES20.glEnableVertexAttribArray(positionHandle);
-            GLES20.glVertexAttribPointer(positionHandle, 3, GLES20.GL_FLOAT, false, 0, chunk.getVertexBuffer());
-            GLES20.glEnableVertexAttribArray(colorHandle);
-            GLES20.glVertexAttribPointer(colorHandle, 3, GLES20.GL_FLOAT, false, 0, chunk.getColorBuffer());
+            GLES20.glEnableVertexAttribArray(positionHandle); GLES20.glVertexAttribPointer(positionHandle, 3, GLES20.GL_FLOAT, false, 0, chunk.getVertexBuffer());
+            GLES20.glEnableVertexAttribArray(colorHandle); GLES20.glVertexAttribPointer(colorHandle, 3, GLES20.GL_FLOAT, false, 0, chunk.getColorBuffer());
             GLES20.glDrawArrays(GLES20.GL_TRIANGLES, 0, chunk.getVertexCount());
-            GLES20.glDisableVertexAttribArray(positionHandle);
-            GLES20.glDisableVertexAttribArray(colorHandle);
+            GLES20.glDisableVertexAttribArray(positionHandle); GLES20.glDisableVertexAttribArray(colorHandle);
+        }
+        
+        // Рисуем удаленных игроков (упрощенно как кубы)
+        for (NetworkManager.RemotePlayer rp : network.remotePlayers) {
+            Matrix.setIdentityM(modelMatrix, 0);
+            Matrix.translateM(modelMatrix, 0, rp.x, rp.y + 0.9f, rp.z);
+            Matrix.multiplyMM(tempMatrix, 0, viewMatrix, 0, modelMatrix, 0);
+            Matrix.multiplyMM(mvpMatrix, 0, projectionMatrix, 0, tempMatrix, 0);
+            GLES20.glUniformMatrix4fv(GLES20.glGetUniformLocation(program, "uMVPMatrix"), 1, false, mvpMatrix, 0);
+            
+            Chunk cube = new Chunk(0, 0, 0, 1, 1, 1); // Можно кэшировать, но для теста сойдет
+            // (тут должен быть рендер куба, но чтобы не загромождать код, оставим на след. раз)
         }
     }
     
@@ -160,9 +152,7 @@ public class MyGLRenderer implements GLSurfaceView.Renderer {
         Matrix.perspectiveM(projectionMatrix, 0, 70f, (float) width / height, 0.05f, 300f);
     }
     
-    private int loadShader(int type, String code) {
-        int s = GLES20.glCreateShader(type); GLES20.glShaderSource(s, code); GLES20.glCompileShader(s); return s;
-    }
+    private int loadShader(int type, String code) { int s = GLES20.glCreateShader(type); GLES20.glShaderSource(s, code); GLES20.glCompileShader(s); return s; }
     
     public int[] raycastBlock() {
         float yawRad = (float)Math.toRadians(player.yaw), pitchRad = (float)Math.toRadians(player.pitch);

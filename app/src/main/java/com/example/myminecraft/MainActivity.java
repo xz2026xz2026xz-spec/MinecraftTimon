@@ -12,10 +12,14 @@ import android.graphics.Rect;
 import android.graphics.RectF;
 import android.opengl.GLSurfaceView;
 import android.os.Bundle;
+import android.view.KeyEvent;
 import android.view.MotionEvent;
 import android.view.View;
 import android.view.Window;
 import android.view.WindowManager;
+import android.view.inputmethod.EditorInfo;
+import android.view.inputmethod.InputMethodManager;
+import android.widget.EditText;
 import android.widget.FrameLayout;
 import android.widget.Toast;
 import java.io.FileInputStream;
@@ -26,14 +30,10 @@ public class MainActivity extends Activity {
     private GLSurfaceView glView;
     private MyGLRenderer renderer;
     private OverlayView overlay;
+    private EditText chatInput;
     
-    private int movePointerId = -1; // Для квадратного джойстика
-    private int lookPointerId = -1;
-    
-    // ID для кнопок действий (3 ряда по 2 кнопки)
-    private int bSwordId = -1, bJumpId = -1;
-    private int bSprintId = -1, bPlaceId = -1;
-    private int bSneakId = -1, bDownId = -1;
+    private int movePointerId = -1, lookPointerId = -1;
+    private int bSwordId = -1, bJumpId = -1, bSprintId = -1, bPlaceId = -1, bSneakId = -1, bDownId = -1;
     
     private float moveCenterX, moveCenterY, knobX, knobY;
     private float moveRadius = 150f;
@@ -51,6 +51,7 @@ public class MainActivity extends Activity {
         super.onCreate(savedInstanceState);
         requestWindowFeature(Window.FEATURE_NO_TITLE);
         getWindow().setFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN, WindowManager.LayoutParams.FLAG_FULLSCREEN);
+        getWindow().setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_NOTHING);
         loadSkin();
         
         renderer = new MyGLRenderer(this);
@@ -63,17 +64,47 @@ public class MainActivity extends Activity {
         layout.addView(glView, new FrameLayout.LayoutParams(-1, -1));
         layout.addView(overlay, new FrameLayout.LayoutParams(-1, -1));
         
+        chatInput = new EditText(this);
+        chatInput.setHint("Сообщение...");
+        chatInput.setTextColor(Color.WHITE);
+        chatInput.setHintTextColor(Color.LTGRAY);
+        chatInput.setBackgroundColor(Color.argb(200, 30, 30, 30));
+        chatInput.setPadding(20, 20, 20, 20);
+        chatInput.setVisibility(View.GONE);
+        chatInput.setSingleLine(true);
+        chatInput.setImeOptions(EditorInfo.IME_ACTION_SEND);
+        
+        FrameLayout.LayoutParams lp = new FrameLayout.LayoutParams(-1, -2);
+        lp.bottomMargin = 200; lp.leftMargin = 50; lp.rightMargin = 50;
+        layout.addView(chatInput, lp);
+        
+        chatInput.setOnEditorActionListener(new EditText.OnEditorActionListener() {
+            @Override public boolean onEditorAction(android.widget.TextView v, int actionId, KeyEvent event) {
+                if (actionId == EditorInfo.IME_ACTION_SEND) {
+                    String txt = chatInput.getText().toString().trim();
+                    if (!txt.isEmpty()) renderer.network.sendChat(txt);
+                    closeChat();
+                    return true;
+                }
+                return false;
+            }
+        });
+        
         glView.setOnTouchListener(new View.OnTouchListener() {
             @Override public boolean onTouch(View v, MotionEvent event) { return handleTouch(event); }
         });
         setContentView(layout);
     }
     
+    private void closeChat() {
+        chatInput.setText("");
+        chatInput.setVisibility(View.GONE);
+        InputMethodManager imm = (InputMethodManager) getSystemService(Context.INPUT_METHOD_SERVICE);
+        imm.hideSoftInputFromWindow(chatInput.getWindowToken(), 0);
+    }
+    
     private void loadSkin() {
-        try {
-            FileInputStream fis = openFileInput("skin.png");
-            skinBitmap = BitmapFactory.decodeStream(fis); fis.close();
-        } catch (Exception e) { skinBitmap = null; }
+        try { FileInputStream fis = openFileInput("skin.png"); skinBitmap = BitmapFactory.decodeStream(fis); fis.close(); } catch (Exception e) { skinBitmap = null; }
     }
     
     @Override protected void onActivityResult(int requestCode, int resultCode, Intent data) {
@@ -86,7 +117,7 @@ public class MainActivity extends Activity {
                 FileOutputStream fos = openFileOutput("skin.png", Context.MODE_PRIVATE);
                 scaled.compress(Bitmap.CompressFormat.PNG, 100, fos); fos.close();
                 loadSkin(); overlay.invalidate();
-            } catch (Exception e) { Toast.makeText(this, "Ошибка загрузки", Toast.LENGTH_SHORT).show(); }
+            } catch (Exception e) { Toast.makeText(this, "Ошибка", Toast.LENGTH_SHORT).show(); }
         }
     }
     
@@ -96,45 +127,30 @@ public class MainActivity extends Activity {
         int W = glView.getWidth(), H = glView.getHeight();
         float scale = getUiScale();
         
-        // Центр джойстика
-        moveCenterX = leftHanded ? W - 200 * scale : 200 * scale;
-        moveCenterY = H - 200 * scale;
-        
-        // Координаты сетки кнопок (3 ряда по 2 кнопки) справа
-        float btnSize = 65 * scale;
-        float gap = 10 * scale;
-        float startX = leftHanded ? 100 * scale : W - 200 * scale;
-        float startY = H - 280 * scale;
-        
-        float cx1 = startX, cx2 = startX + btnSize * 2 + gap;
-        float cy1 = startY, cy2 = startY + btnSize * 2 + gap, cy3 = startY + (btnSize * 2 + gap) * 2;
+        moveCenterX = leftHanded ? W - 160 * scale : 160 * scale;
+        moveCenterY = H - 160 * scale;
+        float bSize = 120 * scale, gap = 15 * scale;
+        float startX = leftHanded ? 20 * scale : W - (bSize * 2 + gap) - 20 * scale;
+        float startY = H - (bSize * 3 + gap * 2) - 150 * scale;
+        float cx1 = startX, cx2 = startX + bSize + gap;
+        float cy1 = startY, cy2 = startY + bSize + gap, cy3 = startY + (bSize + gap) * 2;
 
         if (action == MotionEvent.ACTION_DOWN || action == MotionEvent.ACTION_POINTER_DOWN) {
             float x = event.getX(index), y = event.getY(index);
             int pId = event.getPointerId(index);
             
             if (handleUIDown(x, y, W, H)) { overlay.invalidate(); return true; }
-            if (inventoryOpen || settingsOpen) return true;
+            if (inventoryOpen || settingsOpen || chatInput.getVisibility() == View.VISIBLE) return true;
             
-            // Джойстик (левая часть экрана)
             boolean isJoySide = leftHanded ? (x > W / 2) : (x < W / 2);
-            if (isJoySide && movePointerId == -1) {
-                movePointerId = pId;
-                knobX = x; knobY = y;
-            } 
-            // Сетка кнопок
-            else if (inRect(x, y, cx1, cy1, btnSize) && bSwordId == -1) { bSwordId = pId; doAction(true); }
-            else if (inRect(x, y, cx2, cy1, btnSize) && bJumpId == -1) { bJumpId = pId; renderer.player.jump = true; }
-            else if (inRect(x, y, cx1, cy2, btnSize) && bSprintId == -1) { bSprintId = pId; renderer.player.sprinting = true; }
-            else if (inRect(x, y, cx2, cy2, btnSize) && bPlaceId == -1) { bPlaceId = pId; doAction(false); }
-            else if (inRect(x, y, cx1, cy3, btnSize) && bSneakId == -1) { bSneakId = pId; renderer.player.sneaking = true; }
-            else if (inRect(x, y, cx2, cy3, btnSize) && bDownId == -1) { bDownId = pId; } // Заглушка для стрелки вниз
-            
-            // Камера (остальная часть экрана)
-            else if (!isJoySide && lookPointerId == -1) {
-                lookPointerId = pId;
-                lastSwipeX = x; lastSwipeY = y;
-            }
+            if (isJoySide && movePointerId == -1) { movePointerId = pId; knobX = x; knobY = y; } 
+            else if (inBtn(x, y, cx1, cy1, bSize) && bSwordId == -1) { bSwordId = pId; doAction(true); }
+            else if (inBtn(x, y, cx2, cy1, bSize) && bJumpId == -1) { bJumpId = pId; renderer.player.jump = true; }
+            else if (inBtn(x, y, cx1, cy2, bSize) && bSprintId == -1) { bSprintId = pId; renderer.player.sprinting = true; }
+            else if (inBtn(x, y, cx2, cy2, bSize) && bPlaceId == -1) { bPlaceId = pId; doAction(false); }
+            else if (inBtn(x, y, cx1, cy3, bSize) && bSneakId == -1) { bSneakId = pId; renderer.player.sneaking = true; }
+            else if (inBtn(x, y, cx2, cy3, bSize) && bDownId == -1) { bDownId = pId; } 
+            else if (!isJoySide && lookPointerId == -1) { lookPointerId = pId; lastSwipeX = x; lastSwipeY = y; }
             overlay.invalidate();
         } 
         else if (action == MotionEvent.ACTION_MOVE) {
@@ -161,9 +177,8 @@ public class MainActivity extends Activity {
         } 
         else if (action == MotionEvent.ACTION_UP || action == MotionEvent.ACTION_POINTER_UP) {
             int pId = event.getPointerId(index);
-            if (pId == movePointerId) {
-                movePointerId = -1; renderer.player.moveX = 0; renderer.player.moveZ = 0;
-            } else if (pId == lookPointerId) lookPointerId = -1;
+            if (pId == movePointerId) { movePointerId = -1; renderer.player.moveX = 0; renderer.player.moveZ = 0; }
+            else if (pId == lookPointerId) lookPointerId = -1;
             else if (pId == bSwordId) bSwordId = -1;
             else if (pId == bJumpId) bJumpId = -1;
             else if (pId == bSprintId) { bSprintId = -1; renderer.player.sprinting = false; }
@@ -175,21 +190,29 @@ public class MainActivity extends Activity {
         return true;
     }
     
-    private boolean inRect(float px, float py, float cx, float cy, float r) {
-        return px >= cx && px <= cx + r * 2 && py >= cy && py <= cy + r * 2;
+    private boolean inBtn(float px, float py, float cx, float cy, float size) {
+        return px >= cx && px <= cx + size && py >= cy && py <= cy + size;
     }
     
     private void doAction(boolean isBreak) {
         int[] block = renderer.raycastBlock();
         if (block != null) {
             if (isBreak) {
-                renderer.world.setBlock(block[0], block[1], block[2], Block.AIR);
-                renderer.markDirty(block[0], block[1], block[2]);
+                byte b = renderer.world.getBlock(block[0], block[1], block[2]);
+                if (b != Block.AIR) {
+                    renderer.world.setBlock(block[0], block[1], block[2], Block.AIR);
+                    renderer.markDirty(block[0], block[1], block[2]);
+                    Inventory.addItem(b); // Добавляем в инвентарь
+                }
             } else {
-                int bx = block[0], by = block[1] + 1, bz = block[2];
-                if (!renderer.world.isInsidePlayer(bx, by, bz, renderer.player.x, renderer.player.y, renderer.player.z)) {
-                    renderer.world.setBlock(bx, by, bz, Inventory.getSelectedBlock());
-                    renderer.markDirty(bx, by, bz);
+                // Ставим блок, только если он есть в инвентаре
+                if (Inventory.getSelectedBlock() != Block.AIR) {
+                    int bx = block[0], by = block[1] + 1, bz = block[2];
+                    if (!renderer.world.isInsidePlayer(bx, by, bz, renderer.player.x, renderer.player.y, renderer.player.z)) {
+                        renderer.world.setBlock(bx, by, bz, Inventory.getSelectedBlock());
+                        renderer.markDirty(bx, by, bz);
+                        Inventory.removeSelected(); // Убираем 1 штуку из стака
+                    }
                 }
             }
         }
@@ -198,15 +221,19 @@ public class MainActivity extends Activity {
     private boolean handleUIDown(float x, float y, int W, int H) {
         float scale = getUiScale();
         if (inventoryOpen) {
-            if (inRect(x, y, W - 60, 60, 45 * scale)) { inventoryOpen = false; return true; }
+            if (inCircle(x, y, W - 60, 60, 45 * scale)) { inventoryOpen = false; return true; }
+            // Кнопка "Выбросить"
+            if (x > W/2 - 150 && x < W/2 + 150 && y > H - 450 && y < H - 380) {
+                Inventory.dropItem(Inventory.selectedSlot);
+                return true;
+            }
             return false;
         }
         if (settingsOpen) {
-            if (inRect(x, y, W - 60, 60, 45 * scale)) { settingsOpen = false; return true; }
-            
+            if (inCircle(x, y, W - 60, 60, 45 * scale)) { settingsOpen = false; return true; }
             int btnSize = (int)(110 * scale), gap = (int)(25 * scale);
             int totalW = 5 * btnSize + 4 * gap;
-            int startX = (W - totalW) / 2, startY = H / 2 - 150;
+            int startX = (W - totalW) / 2, startY = H / 2 - 250;
             for (int i = 0; i < 5; i++) {
                 int bx = startX + i * (btnSize + gap);
                 if (x >= bx && x <= bx + btnSize && y >= startY && y <= startY + btnSize) {
@@ -214,18 +241,31 @@ public class MainActivity extends Activity {
                     settingsOpen = false; return true;
                 }
             }
-            if (x > W/2 - 200 && x < W/2 + 200 && y > H/2 + 50 && y < H/2 + 130) { leftHanded = !leftHanded; return true; }
-            if (x > W/2 - 200 && x < W/2 + 200 && y > H/2 + 150 && y < H/2 + 230) { uiSizeMode = (uiSizeMode + 1) % 3; return true; }
-            if (x > W/2 - 200 && x < W/2 + 200 && y > H/2 + 250 && y < H/2 + 330) {
+            if (x > W/2 - 200 && x < W/2 + 200 && y > H/2 + 10 && y < H/2 + 90) { leftHanded = !leftHanded; return true; }
+            if (x > W/2 - 200 && x < W/2 + 200 && y > H/2 + 110 && y < H/2 + 190) { uiSizeMode = (uiSizeMode + 1) % 3; return true; }
+            if (x > W/2 - 200 && x < W/2 + 200 && y > H/2 + 210 && y < H/2 + 290) {
                 Intent intent = new Intent(Intent.ACTION_PICK); intent.setType("image/*");
                 startActivityForResult(intent, 100); return true;
+            }
+            if (x > W/2 - 200 && x < W/2 && y > H/2 + 310 && y < H/2 + 390) {
+                renderer.network.startServer(renderer.world); Toast.makeText(this, "Сервер запущен!", Toast.LENGTH_SHORT).show(); return true;
+            }
+            if (x > W/2 && x < W/2 + 200 && y > H/2 + 310 && y < H/2 + 390) {
+                renderer.network.connect("127.0.0.1"); Toast.makeText(this, "Подключение...", Toast.LENGTH_SHORT).show(); return true;
             }
             return false;
         }
         
-        if (inRect(x, y, W - 260 * scale, 60, 45 * scale)) { renderer.player.thirdPerson = !renderer.player.thirdPerson; return true; }
-        if (inRect(x, y, W - 160 * scale, 60, 45 * scale)) { inventoryOpen = true; return true; }
-        if (inRect(x, y, W - 60, 60, 45 * scale)) { settingsOpen = true; return true; }
+        if (inCircle(x, y, W - 360 * scale, 60, 45 * scale)) { 
+            chatInput.setVisibility(View.VISIBLE);
+            chatInput.requestFocus();
+            InputMethodManager imm = (InputMethodManager) getSystemService(Context.INPUT_METHOD_SERVICE);
+            imm.showSoftInput(chatInput, InputMethodManager.SHOW_IMPLICIT);
+            return true; 
+        }
+        if (inCircle(x, y, W - 260 * scale, 60, 45 * scale)) { renderer.player.thirdPerson = !renderer.player.thirdPerson; return true; }
+        if (inCircle(x, y, W - 160 * scale, 60, 45 * scale)) { inventoryOpen = true; return true; }
+        if (inCircle(x, y, W - 60, 60, 45 * scale)) { settingsOpen = true; return true; }
         
         int slotSize = (int)(110 * scale), gap = (int)(10 * scale);
         int startX = (W - (9 * slotSize + 8 * gap)) / 2, startY = (int)(H - 140 * scale);
@@ -234,6 +274,10 @@ public class MainActivity extends Activity {
             if (x >= sx && x <= sx + slotSize && y >= startY && y <= startY + slotSize) { Inventory.selectSlot(i); return true; }
         }
         return false;
+    }
+    
+    private boolean inCircle(float px, float py, float cx, float cy, float r) {
+        float dx = px - cx, dy = py - cy; return dx*dx + dy*dy <= r*r;
     }
     
     private class OverlayView extends View {
@@ -252,46 +296,69 @@ public class MainActivity extends Activity {
             int W = getWidth(), H = getHeight();
             float scale = getUiScale();
             
-            // Прицел
             float cx = W/2f, cy = H/2f;
             c.drawLine(cx-30, cy, cx-10, cy, stroke); c.drawLine(cx+10, cy, cx+30, cy, stroke);
             c.drawLine(cx, cy-30, cx, cy-10, stroke); c.drawLine(cx, cy+10, cx, cy+30, stroke);
             
-            // Верхнее меню
+            c.drawCircle(W - 360 * scale, 60, 45 * scale, bg); c.drawCircle(W - 360 * scale, 60, 45 * scale, stroke); 
+            text.setTextSize(45f * scale); c.drawText("💬", W - 360 * scale, 60 + 15 * scale, text);
             c.drawCircle(W - 260 * scale, 60, 45 * scale, bg); c.drawCircle(W - 260 * scale, 60, 45 * scale, stroke); 
-            text.setTextSize(45f * scale); c.drawText(renderer.player.thirdPerson ? "3D" : "1D", W - 260 * scale, 60 + 15 * scale, text);
+            c.drawText(renderer.player.thirdPerson ? "3D" : "1D", W - 260 * scale, 60 + 15 * scale, text);
             c.drawCircle(W - 160 * scale, 60, 45 * scale, bg); c.drawCircle(W - 160 * scale, 60, 45 * scale, stroke); c.drawText("🎒", W - 160 * scale, 60 + 15 * scale, text);
             c.drawCircle(W - 60, 60, 45 * scale, bg); c.drawCircle(W - 60, 60, 45 * scale, stroke); c.drawText("⚙", W - 60, 60 + 15 * scale, text);
             
-            // --- КВАДРАТНЫЙ ДЖОЙСТИК (D-PAD) ---
-            RectF dpOuter = new RectF(moveCenterX - moveRadius*scale, moveCenterY - moveRadius*scale, moveCenterX + moveRadius*scale, moveCenterY + moveRadius*scale);
-            c.drawRect(dpOuter, fill);
-            c.drawRect(dpOuter, stroke);
-            
-            if (movePointerId != -1) {
-                c.drawCircle(knobX, knobY, 50f * scale, bg);
-                c.drawCircle(knobX, knobY, 50f * scale, stroke);
-            } else {
-                c.drawRect(moveCenterX - 40*scale, moveCenterY - 40*scale, moveCenterX + 40*scale, moveCenterY + 40*scale, stroke);
+            Paint listBg = new Paint(); listBg.setColor(Color.argb(150, 0, 0, 0));
+            text.setTextAlign(Paint.Align.LEFT); text.setTextSize(35f * scale);
+            int listY = 50;
+            synchronized(renderer.network.playerNames) {
+                c.drawRect(20, listY - 30, 20 + text.measureText("Игроки:") + 40, listY + (renderer.network.playerNames.size() * 45f * scale) + 10, listBg);
+                c.drawText("Игроки:", 30, listY, text);
+                listY += 45 * scale;
+                for (String name : renderer.network.playerNames) {
+                    c.drawText("- " + name, 30, listY, text);
+                    listY += 45 * scale;
+                }
             }
             
-            // --- СЕТКА КНОПОК ДЕЙСТВИЙ (3 ряда по 2) ---
-            float btnSize = 65 * scale;
-            float gap = 10 * scale;
-            float startX = leftHanded ? 100 * scale : W - 200 * scale;
-            float startY = H - 280 * scale;
+            Paint chatBg = new Paint(); chatBg.setColor(Color.argb(120, 0, 0, 0));
+            text.setTextSize(35f * scale);
+            int msgY = Math.max(listY + 50, 200 * (int)scale);
+            synchronized (renderer.network.chatMessages) {
+                int start = Math.max(0, renderer.network.chatMessages.size() - 5);
+                for (int i = start; i < renderer.network.chatMessages.size(); i++) {
+                    String msg = renderer.network.chatMessages.get(i);
+                    c.drawRect(20, msgY - 35*scale, 20 + text.measureText(msg) + 20, msgY + 10, chatBg);
+                    c.drawText(msg, 30, msgY, text);
+                    msgY += 45 * scale;
+                }
+            }
             
-            float cx1 = startX, cx2 = startX + btnSize * 2 + gap;
-            float cy1 = startY, cy2 = startY + btnSize * 2 + gap, cy3 = startY + (btnSize * 2 + gap) * 2;
+            float joyCX = leftHanded ? W - 160 * scale : 160 * scale;
+            float joyCY = H - 160 * scale;
+            RectF dpOuter = new RectF(joyCX - moveRadius*scale, joyCY - moveRadius*scale, joyCX + moveRadius*scale, joyCY + moveRadius*scale);
+            c.drawRect(dpOuter, fill); c.drawRect(dpOuter, stroke);
+            if (movePointerId != -1) { c.drawCircle(knobX, knobY, 50f * scale, bg); c.drawCircle(knobX, knobY, 50f * scale, stroke); }
+            else { c.drawRect(joyCX - 40*scale, joyCY - 40*scale, joyCX + 40*scale, joyCY + 40*scale, stroke); }
             
-            drawPEBtn(c, cx1, cy1, btnSize, "⚔", bSwordId != -1);
-            drawPEBtn(c, cx2, cy1, btnSize, "↑", bJumpId != -1);
-            drawPEBtn(c, cx1, cy2, btnSize, "»", bSprintId != -1);
-            drawPEBtn(c, cx2, cy2, btnSize, "+", bPlaceId != -1);
-            drawPEBtn(c, cx1, cy3, btnSize, "✛", bSneakId != -1);
-            drawPEBtn(c, cx2, cy3, btnSize, "↓", bDownId != -1);
+            float bSize = 120 * scale, gap = 15 * scale;
+            float startX = leftHanded ? 20 * scale : W - (bSize * 2 + gap) - 20 * scale;
+            float startY = H - (bSize * 3 + gap * 2) - 150 * scale;
+            float cx1 = startX, cx2 = startX + bSize + gap;
+            float cy1 = startY, cy2 = startY + bSize + gap, cy3 = startY + (bSize + gap) * 2;
             
-            // Хотбар
+            drawPEBtn(c, cx1, cy1, bSize, "⚔", bSwordId != -1); drawPEBtn(c, cx2, cy1, bSize, "↑", bJumpId != -1);
+            drawPEBtn(c, cx1, cy2, bSize, "»", bSprintId != -1); drawPEBtn(c, cx2, cy2, bSize, "+", bPlaceId != -1);
+            drawPEBtn(c, cx1, cy3, bSize, "✛", bSneakId != -1); drawPEBtn(c, cx2, cy3, bSize, "↓", bDownId != -1);
+            
+            float barY = H - 185 * scale;
+            float iconSize = 45f * scale;
+            text.setTextSize(iconSize);
+            text.setTextAlign(Paint.Align.CENTER);
+            float hStartX = W/2f - 20 * scale - (10 * iconSize);
+            for (int i = 0; i < 10; i++) c.drawText("❤️", hStartX + i * iconSize + iconSize/2, barY, text);
+            float fStartX = W/2f + 20 * scale;
+            for (int i = 0; i < 10; i++) c.drawText("🍗", fStartX + i * iconSize + iconSize/2, barY, text);
+            
             int slotSize = (int)(110 * scale), hGap = (int)(10 * scale);
             int hStartX = (W - (9 * slotSize + 8 * hGap)) / 2, hStartY = (int)(H - 140 * scale);
             for (int i = 0; i < 9; i++) {
@@ -300,11 +367,17 @@ public class MainActivity extends Activity {
                 p.setColor(Color.argb(i == Inventory.selectedSlot ? 220 : 100, 0, 0, 0));
                 c.drawRect(sx, hStartY, sx+slotSize, hStartY+slotSize, p);
                 c.drawRect(sx, hStartY, sx+slotSize, hStartY+slotSize, stroke);
-                byte b = Inventory.slots[i];
+                
+                byte b = Inventory.slots[i].type;
                 if (b != Block.AIR) {
                     float[] col = Block.getUITopColor(b);
                     p.setColor(Color.rgb((int)(col[0]*255), (int)(col[1]*255), (int)(col[2]*255)));
                     c.drawRect(sx+20, hStartY+20, sx+slotSize-20, hStartY+slotSize-20, p);
+                    
+                    if (Inventory.slots[i].count > 1) {
+                        text.setTextSize(30f * scale); text.setTextAlign(Paint.Align.RIGHT);
+                        c.drawText(String.valueOf(Inventory.slots[i].count), sx + slotSize - 5, hStartY + slotSize - 5, text);
+                    }
                 }
             }
             if (inventoryOpen) drawInventory(c, W, H);
@@ -312,45 +385,63 @@ public class MainActivity extends Activity {
         }
         
         private void drawPEBtn(Canvas c, float x, float y, float size, String label, boolean pressed) {
-            RectF r = new RectF(x, y, x + size * 2, y + size * 2);
+            RectF r = new RectF(x, y, x + size, y + size);
             Paint p = new Paint(Paint.ANTI_ALIAS_FLAG);
-            p.setStyle(Paint.Style.FILL);
-            p.setColor(pressed ? Color.argb(150, 255, 255, 255) : Color.argb(100, 50, 50, 50));
+            p.setStyle(Paint.Style.FILL); p.setColor(pressed ? Color.argb(150, 255, 255, 255) : Color.argb(100, 50, 50, 50));
             c.drawRect(r, p);
-            p.setStyle(Paint.Style.STROKE);
-            p.setColor(Color.WHITE);
-            p.setStrokeWidth(4f);
-            c.drawRect(r, p);
-            
-            text.setTextSize(size * 1.2f);
-            c.drawText(label, x + size, y + size + size * 0.4f, text);
+            p.setStyle(Paint.Style.STROKE); p.setColor(Color.WHITE); p.setStrokeWidth(4f); c.drawRect(r, p);
+            text.setTextSize(size * 0.6f); text.setTextAlign(Paint.Align.CENTER); c.drawText(label, x + size/2f, y + size/2f + size * 0.2f, text);
         }
         
         private void drawInventory(Canvas c, int W, int H) {
             Paint dim = new Paint(); dim.setColor(Color.argb(220, 0, 0, 0)); c.drawRect(0, 0, W, H, dim);
-            text.setTextSize(60f); c.drawText("Инвентарь", W/2f, 100, text);
+            text.setTextSize(60f); text.setTextAlign(Paint.Align.CENTER); c.drawText("Инвентарь", W/2f, 100, text);
             c.drawCircle(W - 60, 60, 45, bg); c.drawCircle(W - 60, 60, 45, stroke); c.drawText("X", W - 60, 75, text);
             
             int slotSize = 100, hGap = 10;
             int startX = (W - (9 * slotSize + 8 * hGap)) / 2, startY = 150;
-            for (int row = 0; row < 3; row++) for (int i = 0; i < 9; i++) c.drawRect(startX + i*(slotSize+hGap), startY + row*(slotSize+hGap), startX + i*(slotSize+hGap) + slotSize, startY + row*(slotSize+hGap) + slotSize, stroke);
+            for (int row = 0; row < 3; row++) {
+                for (int i = 0; i < 9; i++) {
+                    int sx = startX + i*(slotSize+hGap);
+                    int sy = startY + row*(slotSize+hGap);
+                    c.drawRect(sx, sy, sx + slotSize, sy + slotSize, stroke);
+                    
+                    int idx = 9 + row * 9 + i;
+                    byte b = Inventory.slots[idx].type;
+                    if (b != Block.AIR) {
+                        Paint p = new Paint(); 
+                        float[] col = Block.getUITopColor(b);
+                        p.setColor(Color.rgb((int)(col[0]*255), (int)(col[1]*255), (int)(col[2]*255)));
+                        c.drawRect(sx+15, sy+15, sx+slotSize-15, sy+slotSize-15, p);
+                        
+                        if (Inventory.slots[idx].count > 1) {
+                            text.setTextSize(30f); text.setTextAlign(Paint.Align.RIGHT);
+                            c.drawText(String.valueOf(Inventory.slots[idx].count), sx + slotSize - 5, sy + slotSize - 5, text);
+                        }
+                    }
+                }
+            }
             
-            int cx = W/2 + 150, cy = H - 300;
+            // Кнопка "Выбросить" (внизу инвентаря)
+            Paint btn = new Paint(); btn.setColor(Color.rgb(180, 60, 60));
+            c.drawRect(W/2 - 150, H - 450, W/2 + 150, H - 380, btn);
+            c.drawRect(W/2 - 150, H - 450, W/2 + 150, H - 380, stroke);
+            text.setTextSize(40f); text.setTextAlign(Paint.Align.CENTER);
+            c.drawText("Выбросить", W/2f, H - 405, text);
+            
+            int cx = W/2 + 150, cy = H - 250;
             if (skinBitmap != null) c.drawBitmap(skinBitmap, null, new Rect(cx-100, cy-100, cx+100, cy+100), skinPaint);
-            
-            int hbY = H - 140, hbX = (W - (9 * 110 + 8 * 10)) / 2;
-            for (int i = 0; i < 9; i++) c.drawRect(hbX + i * 120, hbY, hbX + i * 120 + 110, hbY+110, stroke);
         }
         
         private void drawSettings(Canvas c, int W, int H) {
             Paint dim = new Paint(); dim.setColor(Color.argb(220, 0, 0, 0)); c.drawRect(0, 0, W, H, dim);
-            text.setTextSize(60f); c.drawText("Настройки", W/2f, 100, text);
+            text.setTextSize(60f); text.setTextAlign(Paint.Align.CENTER); c.drawText("Настройки", W/2f, 80, text);
             c.drawCircle(W - 60, 60, 45, bg); c.drawCircle(W - 60, 60, 45, stroke); c.drawText("X", W - 60, 75, text);
             
-            text.setTextSize(40f); c.drawText("Выбор мира:", W/2f, H/2 - 200, text);
+            text.setTextSize(40f); c.drawText("Выбор мира:", W/2f, H/2 - 250, text);
             int btnSize = 110, gap = 25;
             int totalW = 5 * btnSize + 4 * gap;
-            int startX = (W - totalW) / 2, startY = H / 2 - 150;
+            int startX = (W - totalW) / 2, startY = H / 2 - 250 + 40;
             for (int i = 0; i < 5; i++) {
                 int bx = startX + i * (btnSize + gap);
                 boolean exists = renderer.worldExists(i + 1);
@@ -363,17 +454,25 @@ public class MainActivity extends Activity {
             }
             
             Paint btnBg = new Paint(); btnBg.setColor(Color.rgb(80, 130, 200));
-            text.setTextSize(36f); c.drawText("Раскладка", W/2f, H/2 + 30, text);
-            c.drawRect(W/2 - 200, H/2 + 50, W/2 + 200, H/2 + 130, btnBg); c.drawRect(W/2 - 200, H/2 + 50, W/2 + 200, H/2 + 130, stroke);
-            text.setTextSize(40f); c.drawText(leftHanded ? "Режим: Левша" : "Режим: Правша", W/2f, H/2 + 105, text);
+            text.setTextSize(36f); c.drawText("Раскладка", W/2f, H/2 + 40, text);
+            c.drawRect(W/2 - 200, H/2 + 10, W/2 + 200, H/2 + 90, btnBg); c.drawRect(W/2 - 200, H/2 + 10, W/2 + 200, H/2 + 90, stroke);
+            text.setTextSize(40f); c.drawText(leftHanded ? "Левша" : "Правша", W/2f, H/2 + 65, text);
             
-            text.setTextSize(36f); c.drawText("Размер", W/2f, H/2 + 180, text);
-            c.drawRect(W/2 - 200, H/2 + 150, W/2 + 200, H/2 + 230, btnBg); c.drawRect(W/2 - 200, H/2 + 150, W/2 + 200, H/2 + 230, stroke);
-            text.setTextSize(40f); c.drawText(uiSizeMode == 0 ? "Маленький" : (uiSizeMode == 2 ? "Большой" : "Средний"), W/2f, H/2 + 205, text);
+            text.setTextSize(36f); c.drawText("Размер", W/2f, H/2 + 140, text);
+            c.drawRect(W/2 - 200, H/2 + 110, W/2 + 200, H/2 + 190, btnBg); c.drawRect(W/2 - 200, H/2 + 110, W/2 + 200, H/2 + 190, stroke);
+            text.setTextSize(40f); c.drawText(uiSizeMode == 0 ? "Маленький" : (uiSizeMode == 2 ? "Большой" : "Средний"), W/2f, H/2 + 165, text);
             
-            text.setTextSize(36f); c.drawText("Скин", W/2f, H/2 + 280, text);
-            c.drawRect(W/2 - 200, H/2 + 250, W/2 + 200, H/2 + 330, btnBg); c.drawRect(W/2 - 200, H/2 + 250, W/2 + 200, H/2 + 330, stroke);
-            text.setTextSize(40f); c.drawText("Загрузить", W/2f, H/2 + 305, text);
+            text.setTextSize(36f); c.drawText("Скин", W/2f, H/2 + 240, text);
+            c.drawRect(W/2 - 200, H/2 + 210, W/2 + 200, H/2 + 290, btnBg); c.drawRect(W/2 - 200, H/2 + 210, W/2 + 200, H/2 + 290, stroke);
+            text.setTextSize(40f); c.drawText("Загрузить", W/2f, H/2 + 265, text);
+            
+            Paint netBtn = new Paint(); netBtn.setColor(Color.rgb(60, 180, 60));
+            c.drawRect(W/2 - 200, H/2 + 310, W/2 - 10, H/2 + 390, netBtn); c.drawRect(W/2 - 200, H/2 + 310, W/2 - 10, H/2 + 390, stroke);
+            text.setTextSize(36f); c.drawText("Открыть мир", W/2 - 105, H/2 + 365, text);
+            
+            netBtn.setColor(Color.rgb(180, 60, 60));
+            c.drawRect(W/2 + 10, H/2 + 310, W/2 + 200, H/2 + 390, netBtn); c.drawRect(W/2 + 10, H/2 + 310, W/2 + 200, H/2 + 390, stroke);
+            c.drawText("Подключиться", W/2 + 105, H/2 + 365, text);
         }
     }
     

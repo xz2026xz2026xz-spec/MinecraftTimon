@@ -21,7 +21,8 @@ public class World {
         Random rnd = new Random(seed);
         for (int x = 0; x < SIZE_X; x++) {
             for (int z = 0; z < SIZE_Z; z++) {
-                double h = 10 + 2 * Math.sin(x * 0.1) + 2 * Math.cos(z * 0.1) + 1 * Math.sin((x + z) * 0.05) + rnd.nextDouble();
+                // Уменьшили амплитуду холмов (было 2.0, стало 1.2) и убрали резкие перепады
+                double h = 12 + 1.2 * Math.sin(x * 0.05) + 1.2 * Math.cos(z * 0.05) + 0.5 * rnd.nextDouble();
                 int height = (int) h;
                 
                 for (int y = 0; y < SIZE_Y; y++) {
@@ -31,7 +32,7 @@ public class World {
                     else if (y < height) blocks[x][y][z] = Block.GRASS;
                     else blocks[x][y][z] = Block.AIR;
                 }
-                if (rnd.nextDouble() < 0.01 && height < SIZE_Y - 6) placeTree(x, height, z);
+                if (rnd.nextDouble() < 0.015 && height < SIZE_Y - 6) placeTree(x, height, z);
             }
         }
     }

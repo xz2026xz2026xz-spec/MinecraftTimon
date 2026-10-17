@@ -6,11 +6,12 @@ public class Player {
     public float pitch = 0f;
     public float vy = 0f;
     public volatile boolean sneaking = false;
-    public volatile boolean sprinting = false; // НОВОЕ: Переменная для бега
+    public volatile boolean sprinting = false;
     public boolean thirdPerson = false;
     
-    public static final float GRAVITY = -0.025f;
-    public static final float JUMP = 0.27f;
+    // Гравитация стала слабее (медленное падение)
+    public static final float GRAVITY = -0.012f;
+    public static final float JUMP = 0.22f; 
     public static final float SPEED = 0.12f; 
     
     public float moveX = 0f;
@@ -23,9 +24,7 @@ public class Player {
     public float getHeight() { return sneaking ? 1.1f : 1.7f; }
     
     public void update(World world) {
-        // Если бежим - скорость x1.5, если крадемся - x0.45
         float speed = sneaking ? SPEED * 0.45f : (sprinting ? SPEED * 1.5f : SPEED);
-        
         if (moveX != 0 || moveZ != 0) {
             float len = (float)Math.sqrt(moveX*moveX + moveZ*moveZ);
             float nx = moveX / len, nz = moveZ / len;
@@ -42,7 +41,8 @@ public class Player {
         }
         
         vy += GRAVITY;
-        if (vy < -0.4f) vy = -0.4f; 
+        // Ограничиваем скорость падения (медленнее падаем)
+        if (vy < -0.25f) vy = -0.25f; 
         float newY = y + vy;
         
         if (vy < 0) {
