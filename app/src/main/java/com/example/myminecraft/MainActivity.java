@@ -23,12 +23,9 @@ import android.view.inputmethod.EditorInfo;
 import android.view.inputmethod.InputMethodManager;
 import android.widget.EditText;
 import android.widget.FrameLayout;
-import android.widget.Toast;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.InputStream;
-import java.util.ArrayList;
-import java.util.List;
 
 public class MainActivity extends Activity {
     private GLSurfaceView glView;
@@ -55,9 +52,6 @@ public class MainActivity extends Activity {
     private float settingsScrollY = 0f;
     private float lastScrollY = 0f;
     private boolean isScrollingSettings = false;
-    
-    private List<Integer> swipedSlots = new ArrayList<>();
-    private int dragOriginalCount = 0;
     
     @Override protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -142,7 +136,7 @@ public class MainActivity extends Activity {
 
     private void showIpDialog() {
         AlertDialog.Builder builder = new AlertDialog.Builder(this);
-        builder.setTitle("Введите IP друга (например 192.168.1.5)");
+        builder.setTitle("Введите IP друга");
         final EditText input = new EditText(this);
         builder.setView(input);
         builder.setPositiveButton("Подключиться", (dialog, which) -> {
@@ -156,7 +150,7 @@ public class MainActivity extends Activity {
     private void showServerIpDialog() {
         AlertDialog.Builder builder = new AlertDialog.Builder(this);
         builder.setTitle("Сервер запущен!");
-        builder.setMessage("Ваш IP-адрес: " + getLocalIp() + "\n\nСкажите его другу, чтобы он подключился.");
+        builder.setMessage("Ваш IP: " + getLocalIp() + "\n\nСкажите его другу.");
         builder.setPositiveButton("ОК", (dialog, which) -> dialog.dismiss());
         builder.show();
     }
@@ -189,10 +183,10 @@ public class MainActivity extends Activity {
         moveCenterY = H - 160 * scale;
         
         float bSize = 120 * scale, gap = 15 * scale;
-        float startX = leftHanded ? 20 * scale : W - (bSize * 2 + gap) - 20 * scale;
-        float startY = H - (bSize * 3 + gap * 2) - 200 * scale;
-        float cx1 = startX, cx2 = startX + bSize + gap;
-        float cy1 = startY, cy2 = startY + bSize + gap, cy3 = startY + (bSize + gap) * 2;
+        float btnStartX = leftHanded ? 20 * scale : W - (bSize * 2 + gap) - 20 * scale;
+        float btnStartY = H - (bSize * 3 + gap * 2) - 200 * scale;
+        float cx1 = btnStartX, cx2 = btnStartX + bSize + gap;
+        float cy1 = btnStartY, cy2 = btnStartY + bSize + gap, cy3 = btnStartY + (bSize + gap) * 2;
 
         if (action == MotionEvent.ACTION_DOWN || action == MotionEvent.ACTION_POINTER_DOWN) {
             float x = event.getX(index), y = event.getY(index);
@@ -206,31 +200,24 @@ public class MainActivity extends Activity {
             if (craftingOpen) { handleCraftingUIDown(x, y, W, H); overlay.invalidate(); return true; }
             
             if (inventoryOpen) {
-                if (x > W/2 - 100 && x < W/2 + 100 && y > H - 350 && y < H - 280) { craftingOpen = true; inventoryOpen = false; return true; }
+                if (x > W/2 + 150 && x < W/2 + 350 && y > 60 && y < 120) { craftingOpen = true; inventoryOpen = false; return true; }
                 int slotSize = 100, hGap = 10;
-                int startX = (W - (9 * slotSize + 8 * hGap)) / 2, startY = 150;
+                int invStartX = (W - (9 * slotSize + 8 * hGap)) / 2, invStartY = 150;
                 
-                // Проверяем, не нажал ли он на слот для свайпа
                 for (int row = 0; row < 3; row++) {
                     for (int i = 0; i < 9; i++) {
-                        int sx = startX + i*(slotSize+hGap);
-                        int sy = startY + row*(slotSize+hGap);
+                        int sx = invStartX + i*(slotSize+hGap);
+                        int sy = invStartY + row*(slotSize+hGap);
                         if (x >= sx && x <= sx + slotSize && y >= sy && y <= sy + slotSize) {
-                            Inventory.movingSlot = 9 + row * 9 + i;
-                            dragOriginalCount = Inventory.slots[Inventory.movingSlot].count;
-                            swipedSlots.clear();
-                            return true;
+                            handleSlotClick(9 + row * 9 + i); return true;
                         }
                     }
                 }
                 int hotbarY = (int)(H - 200 * scale);
                 for (int i = 0; i < 9; i++) {
-                    int sx = startX + i*(slotSize+hGap);
+                    int sx = invStartX + i*(slotSize+hGap);
                     if (x >= sx && x <= sx + slotSize && y >= hotbarY && y <= hotbarY + slotSize) {
-                        Inventory.movingSlot = i;
-                        dragOriginalCount = Inventory.slots[Inventory.movingSlot].count;
-                        swipedSlots.clear();
-                        return true;
+                        handleSlotClick(i); return true;
                     }
                 }
                 return true;
@@ -251,53 +238,6 @@ public class MainActivity extends Activity {
             overlay.invalidate();
         } 
         else if (action == MotionEvent.ACTION_MOVE) {
-            if (inventoryOpen && Inventory.movingSlot != -1) {
-                // Логика свайпа по слотам
-                int slotSize = 100, hGap = 10;
-                int startX = (W - (9 * slotSize + 8 * hGap)) / 2, startY = 150;
-                float x = event.getX(index), y = event.getY(index);
-                
-                int currentSlot = -1;
-                for (int row = 0; row < 3; row++) {
-                    for (int i = 0; i < 9; i++) {
-                        int sx = startX + i*(slotSize+hGap);
-                        int sy = startY + row*(slotSize+hGap);
-                        if (x >= sx && x <= sx + slotSize && y >= sy && y <= sy + slotSize) currentSlot = 9 + row * 9 + i;
-                    }
-                }
-                int hotbarY = (int)(H - 200 * scale);
-                for (int i = 0; i < 9; i++) {
-                    int sx = startX + i*(slotSize+hGap);
-                    if (x >= sx && x <= sx + slotSize && y >= hotbarY && y <= hotbarY + slotSize) currentSlot = i;
-                }
-                
-                if (currentSlot != -1 && currentSlot != Inventory.movingSlot && !swipedSlots.contains(currentSlot)) {
-                    // Слот пустой или такого же типа
-                    if (Inventory.slots[currentSlot].type == Block.AIR || Inventory.slots[currentSlot].type == Inventory.slots[Inventory.movingSlot].type) {
-                        swipedSlots.add(currentSlot);
-                        int totalSlots = swipedSlots.size() + 1;
-                        int amount = dragOriginalCount / totalSlots;
-                        int remainder = dragOriginalCount % totalSlots;
-                        
-                        Inventory.slots[Inventory.movingSlot].count = remainder;
-                        if (remainder == 0) Inventory.slots[Inventory.movingSlot].type = Block.AIR;
-                        
-                        for (int s : swipedSlots) {
-                            Inventory.slots[s].type = Inventory.slots[Inventory.movingSlot].type; // Тип берем из оригинала (до изменений)
-                            Inventory.slots[s].count = amount;
-                        }
-                        // Если изначальный слот опустел, нужно запомнить тип в отдельной переменной
-                        if (Inventory.slots[Inventory.movingSlot].type == Block.AIR && !swipedSlots.isEmpty()) {
-                            Inventory.slots[Inventory.movingSlot].type = Inventory.slots[swipedSlots.get(0)].type;
-                            Inventory.slots[Inventory.movingSlot].count = remainder;
-                            if (remainder == 0) Inventory.slots[Inventory.movingSlot].type = Block.AIR;
-                        }
-                    }
-                }
-                overlay.invalidate();
-                return true;
-            }
-
             if (settingsOpen) {
                 if (isScrollingSettings) {
                     float dy = event.getY(index) - lastScrollY;
@@ -309,7 +249,7 @@ public class MainActivity extends Activity {
                 }
                 return true;
             }
-            if (craftingOpen) return true;
+            if (inventoryOpen || craftingOpen) return true;
 
             for (int i = 0; i < event.getPointerCount(); i++) {
                 int pId = event.getPointerId(i);
@@ -333,21 +273,8 @@ public class MainActivity extends Activity {
             overlay.invalidate();
         } 
         else if (action == MotionEvent.ACTION_UP || action == MotionEvent.ACTION_POINTER_UP) {
-            if (inventoryOpen) {
-                if (Inventory.movingSlot != -1 && swipedSlots.isEmpty()) {
-                    // Это был просто тап
-                    int idx = Inventory.movingSlot;
-                    Inventory.movingSlot = -1;
-                    handleSlotClick(idx); // Логика перестановки
-                } else {
-                    Inventory.movingSlot = -1;
-                    swipedSlots.clear();
-                }
-                overlay.invalidate();
-                return true;
-            }
             if (settingsOpen) { isScrollingSettings = false; return true; }
-            if (craftingOpen) return true;
+            if (inventoryOpen || craftingOpen) return true;
             
             int pId = event.getPointerId(index);
             if (pId == movePointerId) { movePointerId = -1; renderer.player.moveX = 0; renderer.player.moveZ = 0; }
@@ -382,7 +309,8 @@ public class MainActivity extends Activity {
                     renderer.world.setBlock(block[0], block[1], block[2], Block.AIR);
                     renderer.markDirty(block[0], block[1], block[2]);
                     if (b == Block.LEAVES && Math.random() < 0.2) Inventory.addItem(Block.APPLE);
-                    else if (b == Block.STONE) Inventory.addItem(Block.COBBLESTONE); else Inventory.addItem(b);
+                    else if (b == Block.STONE) Inventory.addItem(Block.COBBLESTONE);
+                    else Inventory.addItem(b);
                 }
             }
         } else {
@@ -596,10 +524,10 @@ public class MainActivity extends Activity {
             else { c.drawRect(joyCX - 40*scale, joyCY - 40*scale, joyCX + 40*scale, joyCY + 40*scale, stroke); }
             
             float bSize = 120 * scale, gap = 15 * scale;
-            float startX = leftHanded ? 20 * scale : W - (bSize * 2 + gap) - 20 * scale;
-            float startY = H - (bSize * 3 + gap * 2) - 200 * scale;
-            float cx1 = startX, cx2 = startX + bSize + gap;
-            float cy1 = startY, cy2 = startY + bSize + gap, cy3 = startY + (bSize + gap) * 2;
+            float btnStartX = leftHanded ? 20 * scale : W - (bSize * 2 + gap) - 20 * scale;
+            float btnStartY = H - (bSize * 3 + gap * 2) - 200 * scale;
+            float cx1 = btnStartX, cx2 = btnStartX + bSize + gap;
+            float cy1 = btnStartY, cy2 = btnStartY + bSize + gap, cy3 = btnStartY + (bSize + gap) * 2;
             
             drawPEBtn(c, cx1, cy1, bSize, "⚔", bSwordId != -1, 100); 
             drawPEBtn(c, cx2, cy1, bSize, "↑", bJumpId != -1, 100);
@@ -708,11 +636,10 @@ public class MainActivity extends Activity {
                 }
             }
             
-            // Кнопка Крафт (теперь вверху справа)
             Paint btn = new Paint(); btn.setColor(Color.rgb(60, 180, 60));
             c.drawRect(W/2 + 150, 60, W/2 + 350, 120, btn);
             c.drawRect(W/2 + 150, 60, W/2 + 350, 120, stroke);
-            text.setTextSize(40f); text.drawText("Крафт", W/2 + 250, 105, text);
+            text.setTextSize(40f); text.setTextAlign(Paint.Align.CENTER); c.drawText("Крафт", W/2 + 250, 105, text); // ИСПРАВЛЕНО!
             
             int hotbarY = (int)(H - 200 * getUiScale());
             for (int i = 0; i < 9; i++) {
@@ -804,7 +731,7 @@ public class MainActivity extends Activity {
                 return String.format("%d.%d.%d.%d", (ipAddress & 0xff), (ipAddress >> 8 & 0xff), (ipAddress >> 16 & 0xff), (ipAddress >> 24 & 0xff));
             }
         } catch (Exception e) {}
-        return "Нет Wi-Fi (Включите Wi-Fi)";
+        return "Нет Wi-Fi";
     }
     
     @Override protected void onPause() { super.onPause(); if (glView != null) glView.onPause(); if (renderer != null) { renderer.saveNow(); Inventory.saveToFile(this); } }
