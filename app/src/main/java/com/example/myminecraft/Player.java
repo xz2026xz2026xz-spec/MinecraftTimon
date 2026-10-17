@@ -33,14 +33,11 @@ public class Player {
             float len = (float)Math.sqrt(moveX*moveX + moveZ*moveZ);
             float nx = moveX / len;
             float nz = moveZ / len;
-            
             float rad = (float)Math.toRadians(yaw);
             float sin = (float)Math.sin(rad);
             float cos = (float)Math.cos(rad);
-            
             float dx = (nx * cos + nz * sin) * speed;
             float dz = (nx * sin - nz * cos) * speed;
-            
             tryMove(world, dx, dz);
         }
         
@@ -79,12 +76,13 @@ public class Player {
     }
     
     private boolean collides(World world, float px, float py, float pz) {
-        int minX = (int)Math.floor(px - 0.25f);
-        int maxX = (int)Math.floor(px + 0.25f);
-        int minZ = (int)Math.floor(pz - 0.25f);
-        int maxZ = (int)Math.floor(pz + 0.25f);
-        int minY = (int)Math.floor(py);
-        int maxY = (int)Math.floor(py + getHeight());
+        // +0.01 чтобы блок ПОД ногами не считался препятствием
+        int minX = (int)Math.floor(px - 0.25f + 0.01f);
+        int maxX = (int)Math.floor(px + 0.25f - 0.01f);
+        int minZ = (int)Math.floor(pz - 0.25f + 0.01f);
+        int maxZ = (int)Math.floor(pz + 0.25f - 0.01f);
+        int minY = (int)Math.floor(py + 0.05f);       // ← ключевое!
+        int maxY = (int)Math.floor(py + getHeight() - 0.05f);
         
         for (int bx = minX; bx <= maxX; bx++)
             for (int by = minY; by <= maxY; by++)
@@ -93,10 +91,8 @@ public class Player {
         return false;
     }
     
-    private boolean onGround(World world) {
+    private boolean isOnGround(World world) {
         int by = (int)Math.floor(y - 0.05f);
         return Block.isSolid(world.getBlock((int)Math.floor(x), by, (int)Math.floor(z)));
     }
-    
-    private boolean isOnGround(World world) { return onGround(world); }
 }
