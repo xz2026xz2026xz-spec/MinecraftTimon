@@ -17,6 +17,7 @@ public class World {
     private final byte[][][] blocks = new byte[SIZE_X][SIZE_Y][SIZE_Z];
     public List<Sheep> sheepList = new ArrayList<>();
     public List<Dog> dogList = new ArrayList<>();
+    public List<DroppedItem> droppedItems = new ArrayList<>(); // НОВОЕ
     
     public World(long seed) { generate(seed); }
     public World() {}
@@ -37,21 +38,15 @@ public class World {
             }
         }
         
-        // 15 овечек
         sheepList.clear();
         for (int i = 0; i < 15; i++) {
-            int sx = rnd.nextInt(SIZE_X);
-            int sz = rnd.nextInt(SIZE_Z);
-            sheepList.add(new Sheep(sx + 0.5f, 11f, sz + 0.5f));
+            sheepList.add(new Sheep(rnd.nextInt(SIZE_X) + 0.5f, 11f, rnd.nextInt(SIZE_Z) + 0.5f));
         }
-
-        // 5 собачек
         dogList.clear();
         for (int i = 0; i < 5; i++) {
-            int dx = rnd.nextInt(SIZE_X);
-            int dz = rnd.nextInt(SIZE_Z);
-            dogList.add(new Dog(dx + 0.5f, 11f, dz + 0.5f));
+            dogList.add(new Dog(rnd.nextInt(SIZE_X) + 0.5f, 11f, rnd.nextInt(SIZE_Z) + 0.5f));
         }
+        droppedItems.clear();
     }
     
     private void placeTree(int x, int y, int z) {

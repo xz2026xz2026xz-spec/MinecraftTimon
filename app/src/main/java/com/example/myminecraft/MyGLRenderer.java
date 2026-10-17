@@ -14,10 +14,8 @@ import javax.microedition.khronos.egl.EGLConfig;
 import javax.microedition.khronos.opengles.GL10;
 
 public class MyGLRenderer implements GLSurfaceView.Renderer {
-    private static final String VERTEX_SHADER = 
-        "uniform mat4 uMVPMatrix; attribute vec4 vPosition; attribute vec4 vColor; attribute vec2 aTexCoord; varying vec4 vColorVarying; varying vec2 vTexCoord; void main() { gl_Position = uMVPMatrix * vPosition; vColorVarying = vColor; vTexCoord = aTexCoord; }";
-    private static final String FRAGMENT_SHADER = 
-        "precision mediump float; uniform sampler2D uTexture; varying vec4 vColorVarying; varying vec2 vTexCoord; void main() { if (vTexCoord.x < 0.0) { gl_FragColor = vColorVarying; } else { gl_FragColor = texture2D(uTexture, vTexCoord); } }";
+    private static final String VERTEX_SHADER = "uniform mat4 uMVPMatrix; attribute vec4 vPosition; attribute vec4 vColor; attribute vec2 aTexCoord; varying vec4 vColorVarying; varying vec2 vTexCoord; void main() { gl_Position = uMVPMatrix * vPosition; vColorVarying = vColor; vTexCoord = aTexCoord; }";
+    private static final String FRAGMENT_SHADER = "precision mediump float; uniform sampler2D uTexture; varying vec4 vColorVarying; varying vec2 vTexCoord; void main() { if (vTexCoord.x < 0.0) { gl_FragColor = vColorVarying; } else { gl_FragColor = texture2D(uTexture, vTexCoord); } }";
     
     private int program, positionHandle, colorHandle, mvpMatrixHandle, texCoordHandle, textureUniform;
     private final float[] mvpMatrix = new float[16], projectionMatrix = new float[16], viewMatrix = new float[16], modelMatrix = new float[16], tempMatrix = new float[16];
@@ -27,22 +25,55 @@ public class MyGLRenderer implements GLSurfaceView.Renderer {
     public NetworkManager network = new NetworkManager();
     public List<Chunk> chunks = new ArrayList<>();
     
+    private PlayerModel playerModel;
+    
     private final Context ctx;
     private File saveFile;
     public int currentWorld = 1;
     private volatile boolean savePending = false;
-    private volatile int pendingSwitch = -1; // Защита от краша при смене мира
+    private volatile int pendingSwitch = -1;
+    private volatile boolean pendingDelete = false;
     
     private FloatBuffer bodyVertexBuffer, headVertexBuffer;
+    private FloatBuffer sheepBodyTex, sheepHeadTex, dogBodyTex, dogHeadTex;
+    private FloatBuffer itemTexBuffer;
     
     public MyGLRenderer(Context ctx) {
         this.ctx = ctx;
         saveFile = new File(ctx.getFilesDir(), "world_" + currentWorld + ".dat");
         loadOrGenerate(currentWorld);
         buildMobsMesh();
+        playerModel = new PlayerModel();
+    }
+    
+    private FloatBuffer createTexBuffer(int col, int row) {
+        float tileStep = 1.0f / TextureManager.GRID_SIZE;
+        float epsilon = 0.001f;
+        float u1 = col * tileStep + epsilon;
+        float u2 = (col + 1) * tileStep - epsilon;
+        float v2 = 1.0f - (row * tileStep) - epsilon;
+        float v1 = 1.0f - ((row + 1) * tileStep) + epsilon;
+        
+        float[] tCoords = new float[72];
+        for(int i=0; i<6; i++) {
+            tCoords[i*12] = u1; tCoords[i*12+1] = v1; tCoords[i*12+2] = u2; tCoords[i*12+3] = v1; tCoords[i*12+4] = u2; tCoords[i*12+5] = v2;
+            tCoords[i*12+6] = u1; tCoords[i*12+7] = v1; tCoords[i*12+8] = u2; tCoords[i*12+9] = v2; tCoords[i*12+10] = u1; tCoords[i*12+11] = v2;
+        }
+        
+        ByteBuffer tb = ByteBuffer.allocateDirect(tCoords.length * 4); tb.order(ByteOrder.nativeOrder());
+        FloatBuffer texBuf = tb.asFloatBuffer(); texBuf.put(tCoords); texBuf.position(0);
+        return texBuf;
     }
     
     private void buildMobsMesh() {
+        sheepBodyTex = createTexBuffer(2, 2);
+        sheepHeadTex = createTexBuffer(1, 2);
+        dogBodyTex = createTexBuffer(0, 3);
+        dogHeadTex = createTexBuffer(3, 2);
+        
+        ByteBuffer itemTb = ByteBuffer.allocateDirect(72 * 4); itemTb.order(ByteOrder.nativeOrder());
+        itemTexBuffer = itemTb.asFloatBuffer();
+        
         float[] verts = {
             -0.5f,-0.5f, 0.5f,  0.5f,-0.5f, 0.5f,  0.5f, 0.5f, 0.5f, -0.5f,-0.5f, 0.5f,  0.5f, 0.5f, 0.5f, -0.5f, 0.5f, 0.5f,
              0.5f,-0.5f,-0.5f, -0.5f,-0.5f,-0.5f, -0.5f, 0.5f,-0.5f,  0.5f,-0.5f,-0.5f, -0.5f, 0.5f,-0.5f,  0.5f, 0.5f,-0.5f,
@@ -88,7 +119,8 @@ public class MyGLRenderer implements GLSurfaceView.Renderer {
         }
     }
     
-    public void requestSwitchWorld(int index) { pendingSwitch = index; } // Теперь просто ставим флаг!
+    public void requestSwitchWorld(int index) { pendingSwitch = index; } 
+    public void requestDeleteCurrent() { pendingDelete = true; }
     
     private void doSwitchWorld(int index) {
         world.saveToFile(saveFile, player.x, player.y, player.z, player.yaw, player.pitch);
@@ -115,6 +147,7 @@ public class MyGLRenderer implements GLSurfaceView.Renderer {
         GLES20.glEnable(GLES20.GL_DEPTH_TEST); GLES20.glEnable(GLES20.GL_CULL_FACE); GLES20.glCullFace(GLES20.GL_BACK);
         
         TextureManager.loadTextures(ctx); 
+        TextureManager.loadPlayerSkin(ctx);
         
         int vs = loadShader(GLES20.GL_VERTEX_SHADER, VERTEX_SHADER);
         int fs = loadShader(GLES20.GL_FRAGMENT_SHADER, FRAGMENT_SHADER);
@@ -129,7 +162,7 @@ public class MyGLRenderer implements GLSurfaceView.Renderer {
         savePending = true;
     }
     
-    private void drawMobPart(float x, float y, float z, float yaw, FloatBuffer vb, int texIndex, boolean isHead) {
+    private void drawMobPart(float x, float y, float z, float yaw, FloatBuffer vb, FloatBuffer texBuf, boolean isHead) {
         Matrix.setIdentityM(modelMatrix, 0);
         Matrix.translateM(modelMatrix, 0, x, y + 0.5f, z);
         Matrix.rotateM(modelMatrix, 0, -yaw, 0, 1, 0);
@@ -138,55 +171,108 @@ public class MyGLRenderer implements GLSurfaceView.Renderer {
         Matrix.multiplyMM(mvpMatrix, 0, projectionMatrix, 0, tempMatrix, 0);
         
         GLES20.glUniformMatrix4fv(mvpMatrixHandle, 1, false, mvpMatrix, 0);
-        
         GLES20.glEnableVertexAttribArray(positionHandle); GLES20.glVertexAttribPointer(positionHandle, 3, GLES20.GL_FLOAT, false, 0, vb);
         GLES20.glDisableVertexAttribArray(colorHandle);
-        
-        float tileStep = 1.0f / TextureManager.GRID_SIZE;
-        int col = texIndex % TextureManager.GRID_SIZE;
-        int row = texIndex / TextureManager.GRID_SIZE;
-        float epsilon = 0.001f;
-        
-        float u1 = col * tileStep + epsilon;
-        float u2 = (col + 1) * tileStep - epsilon;
-        float v2 = 1.0f - (row * tileStep) - epsilon;
-        float v1 = 1.0f - ((row + 1) * tileStep) + epsilon;
-        
-        float[] tCoords = new float[72];
-        for(int i=0; i<6; i++) {
-            tCoords[i*12] = u1; tCoords[i*12+1] = v1; tCoords[i*12+2] = u2; tCoords[i*12+3] = v1; tCoords[i*12+4] = u2; tCoords[i*12+5] = v2;
-            tCoords[i*12+6] = u1; tCoords[i*12+7] = v1; tCoords[i*12+8] = u2; tCoords[i*12+9] = v2; tCoords[i*12+10] = u1; tCoords[i*12+11] = v2;
-        }
-        
-        ByteBuffer tb = ByteBuffer.allocateDirect(tCoords.length * 4); tb.order(ByteOrder.nativeOrder());
-        FloatBuffer texBuf = tb.asFloatBuffer(); texBuf.put(tCoords); texBuf.position(0);
-        
         GLES20.glEnableVertexAttribArray(texCoordHandle); GLES20.glVertexAttribPointer(texCoordHandle, 2, GLES20.GL_FLOAT, false, 0, texBuf);
         GLES20.glDrawArrays(GLES20.GL_TRIANGLES, 0, 36);
         GLES20.glDisableVertexAttribArray(positionHandle); GLES20.glDisableVertexAttribArray(texCoordHandle);
     }
     
     private void drawMob(Sheep s) {
-        drawMobPart(s.x, s.y, s.z, s.yaw, bodyVertexBuffer, 10, false);
-        drawMobPart(s.x, s.y, s.z, s.yaw, headVertexBuffer, 9, true);
+        drawMobPart(s.x, s.y, s.z, s.yaw, bodyVertexBuffer, sheepBodyTex, false);
+        drawMobPart(s.x, s.y, s.z, s.yaw, headVertexBuffer, sheepHeadTex, true);
     }
     
     private void drawMob(Dog d) {
-        drawMobPart(d.x, d.y, d.z, d.yaw, bodyVertexBuffer, 12, false);
-        drawMobPart(d.x, d.y, d.z, d.yaw, headVertexBuffer, 11, true);
+        drawMobPart(d.x, d.y, d.z, d.yaw, bodyVertexBuffer, dogBodyTex, false);
+        drawMobPart(d.x, d.y, d.z, d.yaw, headVertexBuffer, dogHeadTex, true);
+    }
+    
+    private void drawDroppedItem(DroppedItem item) {
+        Matrix.setIdentityM(modelMatrix, 0);
+        Matrix.translateM(modelMatrix, 0, item.x, item.y + 0.15f, item.z);
+        Matrix.rotateM(modelMatrix, 0, item.rotation, 0, 1, 0);
+        Matrix.scaleM(modelMatrix, 0, 0.3f, 0.3f, 0.3f);
+        Matrix.multiplyMM(tempMatrix, 0, viewMatrix, 0, modelMatrix, 0);
+        Matrix.multiplyMM(mvpMatrix, 0, projectionMatrix, 0, tempMatrix, 0);
+        GLES20.glUniformMatrix4fv(mvpMatrixHandle, 1, false, mvpMatrix, 0);
+        
+        int col = getTexIndex(item.type) % TextureManager.GRID_SIZE;
+        int row = getTexIndex(item.type) / TextureManager.GRID_SIZE;
+        float tileStep = 1.0f / TextureManager.GRID_SIZE;
+        float epsilon = 0.001f;
+        float u1 = col * tileStep + epsilon;
+        float u2 = (col + 1) * tileStep - epsilon;
+        float v2 = 1.0f - (row * tileStep) - epsilon;
+        float v1 = 1.0f - ((row + 1) * tileStep) + epsilon;
+        
+        itemTexBuffer.position(0);
+        for(int i=0; i<6; i++) {
+            itemTexBuffer.put(u1); itemTexBuffer.put(v1); itemTexBuffer.put(u2); itemTexBuffer.put(v1); itemTexBuffer.put(u2); itemTexBuffer.put(v2);
+            itemTexBuffer.put(u1); itemTexBuffer.put(v1); itemTexBuffer.put(u2); itemTexBuffer.put(v2); itemTexBuffer.put(u1); itemTexBuffer.put(v2);
+        }
+        itemTexBuffer.position(0);
+        
+        GLES20.glEnableVertexAttribArray(positionHandle); GLES20.glVertexAttribPointer(positionHandle, 3, GLES20.GL_FLOAT, false, 0, bodyVertexBuffer);
+        GLES20.glDisableVertexAttribArray(colorHandle);
+        GLES20.glEnableVertexAttribArray(texCoordHandle); GLES20.glVertexAttribPointer(texCoordHandle, 2, GLES20.GL_FLOAT, false, 0, itemTexBuffer);
+        GLES20.glDrawArrays(GLES20.GL_TRIANGLES, 0, 36);
+        GLES20.glDisableVertexAttribArray(positionHandle); GLES20.glDisableVertexAttribArray(texCoordHandle);
+    }
+
+    private void drawPlayer(float x, float y, float z, float yaw, float pitch, boolean isLocal) {
+        if (TextureManager.skinTextureId == -1) return;
+
+        Matrix.setIdentityM(modelMatrix, 0);
+        Matrix.translateM(modelMatrix, 0, x, y + 0.9f, z);
+        Matrix.rotateM(modelMatrix, 0, -yaw, 0, 1, 0);
+        Matrix.multiplyMM(tempMatrix, 0, viewMatrix, 0, modelMatrix, 0);
+        Matrix.multiplyMM(mvpMatrix, 0, projectionMatrix, 0, tempMatrix, 0);
+        GLES20.glUniformMatrix4fv(mvpMatrixHandle, 1, false, mvpMatrix, 0);
+
+        GLES20.glEnableVertexAttribArray(positionHandle); GLES20.glVertexAttribPointer(positionHandle, 3, GLES20.GL_FLOAT, false, 0, playerModel.vertexBuffer);
+        GLES20.glDisableVertexAttribArray(colorHandle);
+        GLES20.glEnableVertexAttribArray(texCoordHandle); GLES20.glVertexAttribPointer(texCoordHandle, 2, GLES20.GL_FLOAT, false, 0, playerModel.texBuffer);
+        
+        GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, TextureManager.skinTextureId);
+        GLES20.glDrawArrays(GLES20.GL_TRIANGLES, 0, playerModel.vertexCount);
+        GLES20.glDisableVertexAttribArray(positionHandle); GLES20.glDisableVertexAttribArray(texCoordHandle);
+        
+        GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, TextureManager.atlasId);
     }
     
     @Override public void onDrawFrame(GL10 unused) {
+        if (TextureManager.skinNeedsReload) {
+            TextureManager.loadPlayerSkin(ctx);
+            TextureManager.skinNeedsReload = false;
+        }
+
         if (pendingSwitch != -1) {
             int n = pendingSwitch;
             pendingSwitch = -1;
-            if (n != currentWorld) doSwitchWorld(n); // Выполняем смену мира только в GL-потоке
+            if (n != currentWorld) doSwitchWorld(n);
+        }
+        
+        if (pendingDelete) {
+            pendingDelete = false;
+            if (saveFile.exists()) saveFile.delete();
+            loadOrGenerate(currentWorld);
+            rebuildAllChunks();
         }
         
         GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT | GLES20.GL_DEPTH_BUFFER_BIT);
         player.update(world);
         for (Sheep s : world.sheepList) s.update(world);
         for (Dog d : world.dogList) d.update(world);
+        
+        for (int i = world.droppedItems.size() - 1; i >= 0; i--) {
+            DroppedItem item = world.droppedItems.get(i);
+            item.update(world);
+            float dx = player.x - item.x, dy = player.y - item.y, dz = player.z - item.z;
+            if (dx*dx + dy*dy + dz*dz < 1.5f && item.pickupDelay == 0) {
+                Inventory.addItem(item.type); world.droppedItems.remove(i);
+            } else if (item.y > 500) world.droppedItems.remove(i);
+        }
         
         if (savePending) {
             savePending = false;
@@ -230,14 +316,17 @@ public class MyGLRenderer implements GLSurfaceView.Renderer {
             GLES20.glEnableVertexAttribArray(positionHandle); GLES20.glVertexAttribPointer(positionHandle, 3, GLES20.GL_FLOAT, false, 0, chunk.getVertexBuffer());
             GLES20.glEnableVertexAttribArray(colorHandle); GLES20.glVertexAttribPointer(colorHandle, 3, GLES20.GL_FLOAT, false, 0, chunk.getColorBuffer());
             GLES20.glEnableVertexAttribArray(texCoordHandle); GLES20.glVertexAttribPointer(texCoordHandle, 2, GLES20.GL_FLOAT, false, 0, chunk.getTextureBuffer());
-            
             GLES20.glDrawArrays(GLES20.GL_TRIANGLES, 0, chunk.getVertexCount());
-            
             GLES20.glDisableVertexAttribArray(positionHandle); GLES20.glDisableVertexAttribArray(colorHandle); GLES20.glDisableVertexAttribArray(texCoordHandle);
         }
         
         for (Sheep s : world.sheepList) drawMob(s);
         for (Dog d : world.dogList) drawMob(d);
+        for (DroppedItem item : world.droppedItems) drawDroppedItem(item);
+        
+        if (player.thirdPerson) {
+            drawPlayer(player.x, player.y, player.z, player.yaw, player.pitch, true);
+        }
     }
     
     @Override public void onSurfaceChanged(GL10 unused, int width, int height) {
@@ -246,6 +335,19 @@ public class MyGLRenderer implements GLSurfaceView.Renderer {
     }
     
     private int loadShader(int type, String code) { int s = GLES20.glCreateShader(type); GLES20.glShaderSource(s, code); GLES20.glCompileShader(s); return s; }
+    
+    private int getTexIndex(byte block) {
+        switch (block) {
+            case Block.GRASS: return 0;
+            case Block.DIRT: return 2;
+            case Block.STONE: return 3;
+            case Block.WOOD: return 5;
+            case Block.LEAVES: return 6;
+            case Block.PLANKS: return 7;
+            case Block.COBBLESTONE: return 8;
+            default: return -1;
+        }
+    }
     
     public int raycastSheep() {
         float yawRad = (float)Math.toRadians(player.yaw), pitchRad = (float)Math.toRadians(player.pitch);
