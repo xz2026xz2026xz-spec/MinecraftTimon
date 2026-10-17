@@ -16,7 +16,6 @@ public class Dog {
     }
 
     public void update(World world) {
-        // Гравитация
         vy -= 0.025f;
         if (vy < -0.4f) vy = -0.4f;
         float newY = y + vy;
@@ -28,16 +27,15 @@ public class Dog {
             } else { y = newY; }
         } else { y = newY; }
 
-        // Искусственный интеллект (собаки бегают чуть быстрее овец)
         moveTimer -= 1;
         if (moveTimer <= 0) {
-            moveTimer = 40 + rnd.nextInt(80);
+            moveTimer = 80 + rnd.nextInt(120);
             if (rnd.nextBoolean()) {
                 moveX = 0; moveZ = 0;
             } else {
                 float angle = rnd.nextFloat() * 360;
-                moveX = (float)Math.cos(Math.toRadians(angle)) * 0.06f;
-                moveZ = (float)Math.sin(Math.toRadians(angle)) * 0.06f;
+                moveX = (float)Math.cos(Math.toRadians(angle)) * 0.02f;
+                moveZ = (float)Math.sin(Math.toRadians(angle)) * 0.02f;
                 yaw = angle;
             }
         }
@@ -49,7 +47,7 @@ public class Dog {
                 !Block.isSolid(world.getBlock((int)Math.floor(nx), (int)Math.floor(y + 1), (int)Math.floor(nz)))) {
                 x = nx; z = nz;
             } else {
-                moveTimer = 0; 
+                moveTimer = 0;
             }
         }
     }

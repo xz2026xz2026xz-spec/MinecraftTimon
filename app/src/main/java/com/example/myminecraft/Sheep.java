@@ -16,7 +16,6 @@ public class Sheep {
     }
 
     public void update(World world) {
-        // Гравитация
         vy -= 0.025f;
         if (vy < -0.4f) vy = -0.4f;
         float newY = y + vy;
@@ -28,16 +27,15 @@ public class Sheep {
             } else { y = newY; }
         } else { y = newY; }
 
-        // Искусственный интеллект (бродит туда-сюда)
         moveTimer -= 1;
         if (moveTimer <= 0) {
-            moveTimer = 60 + rnd.nextInt(100);
+            moveTimer = 100 + rnd.nextInt(150); // Дольше стоят на месте
             if (rnd.nextBoolean()) {
                 moveX = 0; moveZ = 0;
             } else {
                 float angle = rnd.nextFloat() * 360;
-                moveX = (float)Math.cos(Math.toRadians(angle)) * 0.04f;
-                moveZ = (float)Math.sin(Math.toRadians(angle)) * 0.04f;
+                moveX = (float)Math.cos(Math.toRadians(angle)) * 0.015f; // Очень медленно
+                moveZ = (float)Math.sin(Math.toRadians(angle)) * 0.015f;
                 yaw = angle;
             }
         }
@@ -49,7 +47,7 @@ public class Sheep {
                 !Block.isSolid(world.getBlock((int)Math.floor(nx), (int)Math.floor(y + 1), (int)Math.floor(nz)))) {
                 x = nx; z = nz;
             } else {
-                moveTimer = 0; // Ударился об стену, меняем направление
+                moveTimer = 0;
             }
         }
     }

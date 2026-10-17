@@ -27,6 +27,8 @@ import android.widget.Toast;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.InputStream;
+import java.util.ArrayList;
+import java.util.List;
 
 public class MainActivity extends Activity {
     private GLSurfaceView glView;
@@ -53,6 +55,9 @@ public class MainActivity extends Activity {
     private float settingsScrollY = 0f;
     private float lastScrollY = 0f;
     private boolean isScrollingSettings = false;
+    
+    private List<Integer> swipedSlots = new ArrayList<>();
+    private int dragOriginalCount = 0;
     
     @Override protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -170,7 +175,7 @@ public class MainActivity extends Activity {
                 FileOutputStream fos = openFileOutput("skin.png", Context.MODE_PRIVATE);
                 scaled.compress(Bitmap.CompressFormat.PNG, 100, fos); fos.close();
                 loadSkin(); overlay.invalidate();
-            } catch (Exception e) { Toast.makeText(this, "Ошибка", Toast.LENGTH_SHORT).show(); }
+            } catch (Exception e) { }
         }
     }
     
@@ -198,14 +203,37 @@ public class MainActivity extends Activity {
                 else { isScrollingSettings = true; lastScrollY = y; return true; }
             }
             
-            if (craftingOpen) {
-                handleCraftingUIDown(x, y, W, H);
-                overlay.invalidate(); return true;
-            }
+            if (craftingOpen) { handleCraftingUIDown(x, y, W, H); overlay.invalidate(); return true; }
             
             if (inventoryOpen) {
-                handleInventoryUIDown(x, y, W, H);
-                overlay.invalidate(); return true;
+                if (x > W/2 - 100 && x < W/2 + 100 && y > H - 350 && y < H - 280) { craftingOpen = true; inventoryOpen = false; return true; }
+                int slotSize = 100, hGap = 10;
+                int startX = (W - (9 * slotSize + 8 * hGap)) / 2, startY = 150;
+                
+                // Проверяем, не нажал ли он на слот для свайпа
+                for (int row = 0; row < 3; row++) {
+                    for (int i = 0; i < 9; i++) {
+                        int sx = startX + i*(slotSize+hGap);
+                        int sy = startY + row*(slotSize+hGap);
+                        if (x >= sx && x <= sx + slotSize && y >= sy && y <= sy + slotSize) {
+                            Inventory.movingSlot = 9 + row * 9 + i;
+                            dragOriginalCount = Inventory.slots[Inventory.movingSlot].count;
+                            swipedSlots.clear();
+                            return true;
+                        }
+                    }
+                }
+                int hotbarY = (int)(H - 200 * scale);
+                for (int i = 0; i < 9; i++) {
+                    int sx = startX + i*(slotSize+hGap);
+                    if (x >= sx && x <= sx + slotSize && y >= hotbarY && y <= hotbarY + slotSize) {
+                        Inventory.movingSlot = i;
+                        dragOriginalCount = Inventory.slots[Inventory.movingSlot].count;
+                        swipedSlots.clear();
+                        return true;
+                    }
+                }
+                return true;
             }
             
             if (handleUIDown(x, y, W, H)) { overlay.invalidate(); return true; }
@@ -223,6 +251,53 @@ public class MainActivity extends Activity {
             overlay.invalidate();
         } 
         else if (action == MotionEvent.ACTION_MOVE) {
+            if (inventoryOpen && Inventory.movingSlot != -1) {
+                // Логика свайпа по слотам
+                int slotSize = 100, hGap = 10;
+                int startX = (W - (9 * slotSize + 8 * hGap)) / 2, startY = 150;
+                float x = event.getX(index), y = event.getY(index);
+                
+                int currentSlot = -1;
+                for (int row = 0; row < 3; row++) {
+                    for (int i = 0; i < 9; i++) {
+                        int sx = startX + i*(slotSize+hGap);
+                        int sy = startY + row*(slotSize+hGap);
+                        if (x >= sx && x <= sx + slotSize && y >= sy && y <= sy + slotSize) currentSlot = 9 + row * 9 + i;
+                    }
+                }
+                int hotbarY = (int)(H - 200 * scale);
+                for (int i = 0; i < 9; i++) {
+                    int sx = startX + i*(slotSize+hGap);
+                    if (x >= sx && x <= sx + slotSize && y >= hotbarY && y <= hotbarY + slotSize) currentSlot = i;
+                }
+                
+                if (currentSlot != -1 && currentSlot != Inventory.movingSlot && !swipedSlots.contains(currentSlot)) {
+                    // Слот пустой или такого же типа
+                    if (Inventory.slots[currentSlot].type == Block.AIR || Inventory.slots[currentSlot].type == Inventory.slots[Inventory.movingSlot].type) {
+                        swipedSlots.add(currentSlot);
+                        int totalSlots = swipedSlots.size() + 1;
+                        int amount = dragOriginalCount / totalSlots;
+                        int remainder = dragOriginalCount % totalSlots;
+                        
+                        Inventory.slots[Inventory.movingSlot].count = remainder;
+                        if (remainder == 0) Inventory.slots[Inventory.movingSlot].type = Block.AIR;
+                        
+                        for (int s : swipedSlots) {
+                            Inventory.slots[s].type = Inventory.slots[Inventory.movingSlot].type; // Тип берем из оригинала (до изменений)
+                            Inventory.slots[s].count = amount;
+                        }
+                        // Если изначальный слот опустел, нужно запомнить тип в отдельной переменной
+                        if (Inventory.slots[Inventory.movingSlot].type == Block.AIR && !swipedSlots.isEmpty()) {
+                            Inventory.slots[Inventory.movingSlot].type = Inventory.slots[swipedSlots.get(0)].type;
+                            Inventory.slots[Inventory.movingSlot].count = remainder;
+                            if (remainder == 0) Inventory.slots[Inventory.movingSlot].type = Block.AIR;
+                        }
+                    }
+                }
+                overlay.invalidate();
+                return true;
+            }
+
             if (settingsOpen) {
                 if (isScrollingSettings) {
                     float dy = event.getY(index) - lastScrollY;
@@ -234,7 +309,7 @@ public class MainActivity extends Activity {
                 }
                 return true;
             }
-            if (inventoryOpen || craftingOpen) return true;
+            if (craftingOpen) return true;
 
             for (int i = 0; i < event.getPointerCount(); i++) {
                 int pId = event.getPointerId(i);
@@ -258,8 +333,21 @@ public class MainActivity extends Activity {
             overlay.invalidate();
         } 
         else if (action == MotionEvent.ACTION_UP || action == MotionEvent.ACTION_POINTER_UP) {
+            if (inventoryOpen) {
+                if (Inventory.movingSlot != -1 && swipedSlots.isEmpty()) {
+                    // Это был просто тап
+                    int idx = Inventory.movingSlot;
+                    Inventory.movingSlot = -1;
+                    handleSlotClick(idx); // Логика перестановки
+                } else {
+                    Inventory.movingSlot = -1;
+                    swipedSlots.clear();
+                }
+                overlay.invalidate();
+                return true;
+            }
             if (settingsOpen) { isScrollingSettings = false; return true; }
-            if (inventoryOpen || craftingOpen) return true;
+            if (craftingOpen) return true;
             
             int pId = event.getPointerId(index);
             if (pId == movePointerId) { movePointerId = -1; renderer.player.moveX = 0; renderer.player.moveZ = 0; }
@@ -285,21 +373,16 @@ public class MainActivity extends Activity {
             if (sheepIdx != -1) {
                 renderer.world.sheepList.remove(sheepIdx);
                 Inventory.addItem(Block.MEAT);
-                Toast.makeText(this, "Овца убита!", Toast.LENGTH_SHORT).show();
                 return;
             }
-            
             int[] block = renderer.raycastBlock();
             if (block != null) {
                 byte b = renderer.world.getBlock(block[0], block[1], block[2]);
                 if (b != Block.AIR) {
                     renderer.world.setBlock(block[0], block[1], block[2], Block.AIR);
                     renderer.markDirty(block[0], block[1], block[2]);
-                    if (b == Block.LEAVES && Math.random() < 0.2) {
-                        Inventory.addItem(Block.APPLE);
-                    } else {
-                        Inventory.addItem(b);
-                    }
+                    if (b == Block.LEAVES && Math.random() < 0.2) Inventory.addItem(Block.APPLE);
+                    else if (b == Block.STONE) Inventory.addItem(Block.COBBLESTONE); else Inventory.addItem(b);
                 }
             }
         } else {
@@ -324,18 +407,17 @@ public class MainActivity extends Activity {
         int slotSize = 100, gap = 10;
         int startX = W/2 - 200, startY = H/2 - 100;
         
-        // Сетка крафта
         for (int i = 0; i < 4; i++) {
             int sx = startX + (i % 2) * (slotSize + gap);
             int sy = startY + (i / 2) * (slotSize + gap);
             if (x >= sx && x <= sx + slotSize && y >= sy && y <= sy + slotSize) {
-                if (Inventory.movingSlot == -1) { Inventory.movingSlot = 100 + i; } // 100+ для сетки
+                if (Inventory.movingSlot == -1) { Inventory.movingSlot = 100 + i; } 
                 else {
-                    if (Inventory.movingSlot >= 100) { // Меняем внутри сетки
+                    if (Inventory.movingSlot >= 100) {
                         Inventory.Slot tmp = Inventory.craftGrid[Inventory.movingSlot - 100];
                         Inventory.craftGrid[Inventory.movingSlot - 100] = Inventory.craftGrid[i];
                         Inventory.craftGrid[i] = tmp;
-                    } else { // Кидаем из инвентаря
+                    } else {
                         Inventory.Slot tmp = Inventory.craftGrid[i];
                         Inventory.craftGrid[i] = Inventory.slots[Inventory.movingSlot];
                         Inventory.slots[Inventory.movingSlot] = tmp;
@@ -347,41 +429,10 @@ public class MainActivity extends Activity {
             }
         }
         
-        // Слот результата
         int outX = startX + 250, outY = startY + 55;
         if (x >= outX && x <= outX + slotSize && y >= outY && y <= outY + slotSize) {
             Inventory.takeCraftResult();
             return;
-        }
-    }
-    
-    private void handleInventoryUIDown(float x, float y, int W, int H) {
-        float scale = getUiScale();
-        if (inCircle(x, y, W - 60, 60, 45 * scale)) { inventoryOpen = false; Inventory.movingSlot = -1; return; }
-        
-        // Кнопка "Крафт"
-        if (x > W/2 - 100 && x < W/2 + 100 && y > H - 350 && y < H - 280) {
-            craftingOpen = true; inventoryOpen = false; return;
-        }
-        
-        int slotSize = 100, hGap = 10;
-        int startX = (W - (9 * slotSize + 8 * hGap)) / 2, startY = 150;
-        
-        for (int row = 0; row < 3; row++) {
-            for (int i = 0; i < 9; i++) {
-                int sx = startX + i*(slotSize+hGap);
-                int sy = startY + row*(slotSize+hGap);
-                if (x >= sx && x <= sx + slotSize && y >= sy && y <= sy + slotSize) {
-                    handleSlotClick(9 + row * 9 + i); return;
-                }
-            }
-        }
-        int hotbarY = (int)(H - 200 * scale);
-        for (int i = 0; i < 9; i++) {
-            int sx = startX + i*(slotSize+hGap);
-            if (x >= sx && x <= sx + slotSize && y >= hotbarY && y <= hotbarY + slotSize) {
-                handleSlotClick(i); return;
-            }
         }
     }
     
@@ -468,7 +519,6 @@ public class MainActivity extends Activity {
                     renderer.player.hunger += 6;
                     if (renderer.player.hunger > 20) renderer.player.hunger = 20;
                     Inventory.removeSelected();
-                    Toast.makeText(this, "Съедено!", Toast.LENGTH_SHORT).show();
                 } else {
                     Inventory.selectSlot(i); 
                 }
@@ -627,21 +677,17 @@ public class MainActivity extends Activity {
                 drawSlot(c, sx, sy, slotSize, Inventory.craftGrid[i], false, Inventory.movingSlot == 100 + i);
             }
             
-            // Стрелка
             Paint arr = new Paint(Paint.ANTI_ALIAS_FLAG);
             arr.setColor(Color.WHITE); arr.setStrokeWidth(6f); arr.setStyle(Paint.Style.STROKE);
             c.drawLine(startX + 230, startY + 105, startX + 270, startY + 105, arr);
             c.drawLine(startX + 250, startY + 85, startX + 270, startY + 105, arr);
             c.drawLine(startX + 250, startY + 125, startX + 270, startY + 105, arr);
             
-            // Слот результата
             int outX = startX + 250, outY = startY + 55;
             drawSlot(c, outX, outY, slotSize, Inventory.craftOutput, false, false);
             
-            // Подсказка рецепта
-            text.setTextSize(35f); text.setTextAlign(Paint.Align.CENTER);
-            text.setColor(Color.LTGRAY);
-            c.drawText("Рецепт: 4 блока дерева", W/2f, H/2 + 150, text);
+            text.setTextSize(35f); text.setTextAlign(Paint.Align.CENTER); text.setColor(Color.LTGRAY);
+            c.drawText("Рецепт: 1 дерево = 4 доски", W/2f, H/2 + 150, text);
             text.setColor(Color.WHITE);
         }
         
@@ -662,11 +708,11 @@ public class MainActivity extends Activity {
                 }
             }
             
-            // Кнопка Крафт
+            // Кнопка Крафт (теперь вверху справа)
             Paint btn = new Paint(); btn.setColor(Color.rgb(60, 180, 60));
-            c.drawRect(W/2 - 100, H - 350, W/2 + 100, H - 280, btn);
-            c.drawRect(W/2 - 100, H - 350, W/2 + 100, H - 280, stroke);
-            text.setTextSize(40f); c.drawText("Крафт", W/2f, H - 305, text);
+            c.drawRect(W/2 + 150, 60, W/2 + 350, 120, btn);
+            c.drawRect(W/2 + 150, 60, W/2 + 350, 120, stroke);
+            text.setTextSize(40f); text.drawText("Крафт", W/2 + 250, 105, text);
             
             int hotbarY = (int)(H - 200 * getUiScale());
             for (int i = 0; i < 9; i++) {
