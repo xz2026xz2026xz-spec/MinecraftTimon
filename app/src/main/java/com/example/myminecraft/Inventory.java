@@ -1,11 +1,19 @@
 package com.example.myminecraft;
 
 public class Inventory {
-    public static byte[] hotbar = {Block.GRASS, Block.DIRT, Block.STONE, Block.WOOD, Block.LEAVES, Block.AIR, Block.AIR, Block.AIR, Block.AIR};
+    public static byte[] slots = new byte[36];
     public static int selectedSlot = 0;
     
+    static {
+        slots[0] = Block.GRASS;
+        slots[1] = Block.DIRT;
+        slots[2] = Block.STONE;
+        slots[3] = Block.WOOD;
+        slots[4] = Block.LEAVES;
+    }
+    
     public static byte getSelectedBlock() {
-        return hotbar[selectedSlot];
+        return slots[selectedSlot];
     }
     
     public static void selectSlot(int i) {
