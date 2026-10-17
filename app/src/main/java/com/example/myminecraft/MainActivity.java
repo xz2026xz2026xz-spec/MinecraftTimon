@@ -133,7 +133,7 @@ public class MainActivity extends Activity {
             }
         });
         builder.setNegativeButton("Отмена", (dialog, which) -> dialog.cancel());
-        builder.setCanceledOnTouchOutside(false); // Запрет закрытия по клику снаружи
+         // Запрет закрытия по клику снаружи
         builder.show();
     }
 
@@ -147,7 +147,7 @@ public class MainActivity extends Activity {
             if (!ip.isEmpty()) { renderer.network.connect(ip); Toast.makeText(MainActivity.this, "Подключение к " + ip, Toast.LENGTH_SHORT).show(); }
         });
         builder.setNegativeButton("Отмена", (dialog, which) -> dialog.cancel());
-        builder.setCanceledOnTouchOutside(false);
+        
         builder.show();
     }
 
@@ -156,7 +156,7 @@ public class MainActivity extends Activity {
         builder.setTitle("Сервер запущен!");
         builder.setMessage("Ваш IP-адрес: " + getLocalIp() + "\n\nСкажите его другу, чтобы он подключился.");
         builder.setPositiveButton("ОК", (dialog, which) -> dialog.dismiss());
-        builder.setCanceledOnTouchOutside(false);
+        
         builder.show();
     }
     
