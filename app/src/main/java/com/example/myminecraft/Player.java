@@ -5,16 +5,17 @@ public class Player {
     public float yaw = 0f;
     public float pitch = 0f;
     public float vy = 0f;
-    public boolean sneaking = false;
+    public volatile boolean sneaking = false;
+    public volatile boolean sprinting = false; // НОВОЕ: Переменная для бега
     public boolean thirdPerson = false;
     
     public static final float GRAVITY = -0.025f;
-    public static final float JUMP = 0.26f;
+    public static final float JUMP = 0.27f;
     public static final float SPEED = 0.12f; 
     
     public float moveX = 0f;
     public float moveZ = 0f;
-    public boolean jump = false;
+    public volatile boolean jump = false;
     
     public Player(float x, float y, float z) { this.x = x; this.y = y; this.z = z; }
     
@@ -22,7 +23,9 @@ public class Player {
     public float getHeight() { return sneaking ? 1.1f : 1.7f; }
     
     public void update(World world) {
-        float speed = sneaking ? SPEED * 0.45f : SPEED;
+        // Если бежим - скорость x1.5, если крадемся - x0.45
+        float speed = sneaking ? SPEED * 0.45f : (sprinting ? SPEED * 1.5f : SPEED);
+        
         if (moveX != 0 || moveZ != 0) {
             float len = (float)Math.sqrt(moveX*moveX + moveZ*moveZ);
             float nx = moveX / len, nz = moveZ / len;
@@ -33,8 +36,10 @@ public class Player {
             tryMove(world, dx, dz);
         }
         
-        if (jump && isOnGround(world) && !sneaking) vy = JUMP;
-        jump = false;
+        if (jump) {
+            if (isOnGround(world) && !sneaking) vy = JUMP;
+            jump = false;
+        }
         
         vy += GRAVITY;
         if (vy < -0.4f) vy = -0.4f; 
@@ -63,7 +68,6 @@ public class Player {
     }
     
     private boolean collides(World world, float px, float py, float pz) {
-        // Узкий хитбокс, чтобы не застревать
         int minX = (int)Math.floor(px - 0.25f), maxX = (int)Math.floor(px + 0.25f);
         int minZ = (int)Math.floor(pz - 0.25f), maxZ = (int)Math.floor(pz + 0.25f);
         int minY = (int)Math.floor(py + 0.05f), maxY = (int)Math.floor(py + getHeight() - 0.05f);
