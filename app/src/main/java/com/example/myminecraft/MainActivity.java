@@ -50,7 +50,6 @@ public class MainActivity extends Activity {
     public int uiSizeMode = 1; 
     public float getUiScale() { return uiSizeMode == 0 ? 0.8f : (uiSizeMode == 2 ? 1.2f : 1.0f); }
     
-    // Для прокрутки настроек
     private float settingsScrollY = 0f;
     private float settingsStartScrollY = 0f;
     private boolean isScrollingSettings = false;
@@ -198,7 +197,6 @@ public class MainActivity extends Activity {
             if (settingsOpen) {
                 settingsStartScrollY = y;
                 isScrollingSettings = false;
-                // Закрытие настроек работает сразу
                 if (inCircle(x, y, W - 60, 60, 45 * scale)) { settingsOpen = false; return true; }
                 return true;
             }
@@ -254,9 +252,7 @@ public class MainActivity extends Activity {
         } 
         else if (action == MotionEvent.ACTION_UP || action == MotionEvent.ACTION_POINTER_UP) {
             if (settingsOpen) {
-                if (!isScrollingSettings) {
-                    handleUIDown(event.getX(index), event.getY(index), W, H);
-                }
+                if (!isScrollingSettings) { handleUIDown(event.getX(index), event.getY(index), W, H); }
                 return true;
             }
             
@@ -299,6 +295,97 @@ public class MainActivity extends Activity {
                 }
             }
         }
+    }
+    
+    private boolean handleUIDown(float x, float y, int W, int H) {
+        float scale = getUiScale();
+        
+        if (inventoryOpen) {
+            if (inCircle(x, y, W - 60, 60, 45 * scale)) { inventoryOpen = false; Inventory.movingSlot = -1; return true; }
+            int slotSize = 100, hGap = 10;
+            int startX = (W - (9 * slotSize + 8 * hGap)) / 2, startY = 150;
+            
+            for (int row = 0; row < 3; row++) {
+                for (int i = 0; i < 9; i++) {
+                    int sx = startX + i*(slotSize+hGap);
+                    int sy = startY + row*(slotSize+hGap);
+                    if (x >= sx && x <= sx + slotSize && y >= sy && y <= sy + slotSize) {
+                        handleSlotClick(9 + row * 9 + i);
+                        return true;
+                    }
+                }
+            }
+            int hotbarY = (int)(H - 200 * scale);
+            for (int i = 0; i < 9; i++) {
+                int sx = startX + i*(slotSize+hGap);
+                if (x >= sx && x <= sx + slotSize && y >= hotbarY && y <= hotbarY + slotSize) {
+                    handleSlotClick(i);
+                    return true;
+                }
+            }
+            return false;
+        }
+        
+        if (settingsOpen) {
+            if (inCircle(x, y, W - 60, 60, 45 * scale)) { settingsOpen = false; return true; }
+            
+            float sy = y - settingsScrollY;
+            float baseY = H / 2 - 250;
+            
+            int btnSize = (int)(110 * scale), gap = (int)(25 * scale);
+            int totalW = 5 * btnSize + 4 * gap;
+            int startX = (W - totalW) / 2, startY = (int)(baseY + 40);
+            
+            for (int i = 0; i < 5; i++) {
+                int bx = startX + i * (btnSize + gap);
+                if (x >= bx && x <= bx + btnSize && sy >= startY && sy <= startY + btnSize) {
+                    if (renderer.currentWorld != i + 1) { renderer.requestSwitchWorld(i + 1); }
+                    settingsOpen = false; return true;
+                }
+            }
+            
+            if (x > W/2 - 200 && x < W/2 + 200 && sy > baseY + 160 && sy < baseY + 240) { showNicknameDialog(); return true; }
+            if (x > W/2 - 200 && x < W/2 + 200 && sy > baseY + 260 && sy < baseY + 340) { leftHanded = !leftHanded; return true; }
+            if (x > W/2 - 200 && x < W/2 + 200 && sy > baseY + 360 && sy < baseY + 440) { uiSizeMode = (uiSizeMode + 1) % 3; return true; }
+            if (x > W/2 - 200 && x < W/2 + 200 && sy > baseY + 460 && sy < baseY + 540) {
+                Intent intent = new Intent(Intent.ACTION_PICK); intent.setType("image/*");
+                startActivityForResult(intent, 100); return true;
+            }
+            if (x > W/2 - 200 && x < W/2 && sy > baseY + 560 && sy < baseY + 640) {
+                renderer.network.startServer(renderer.world); showServerIpDialog(); return true;
+            }
+            if (x > W/2 && x < W/2 + 200 && sy > baseY + 560 && sy < baseY + 640) {
+                showIpDialog(); return true;
+            }
+            return false;
+        }
+        
+        if (inCircle(x, y, W - 320 * scale, 60, 45 * scale)) { 
+            chatInput.setVisibility(View.VISIBLE); chatInput.requestFocus();
+            InputMethodManager imm = (InputMethodManager) getSystemService(Context.INPUT_METHOD_SERVICE);
+            imm.showSoftInput(chatInput, InputMethodManager.SHOW_IMPLICIT);
+            return true; 
+        }
+        if (inCircle(x, y, W - 230 * scale, 60, 45 * scale)) { renderer.player.thirdPerson = !renderer.player.thirdPerson; return true; }
+        if (inCircle(x, y, W - 140 * scale, 60, 45 * scale)) { inventoryOpen = true; return true; }
+        if (inCircle(x, y, W - 50 * scale, 60, 45 * scale)) { settingsOpen = true; settingsScrollY = 0; return true; }
+        
+        int slotSize = (int)(110 * scale), gap = (int)(10 * scale);
+        int startX = (W - (9 * slotSize + 8 * gap)) / 2, startY = (int)(H - 140 * scale);
+        for (int i = 0; i < 9; i++) {
+            int sx = startX + i * (slotSize + gap);
+            if (x >= sx && x <= sx + slotSize && y >= startY && y <= startY + slotSize) { Inventory.selectSlot(i); return true; }
+        }
+        return false;
+    }
+    
+    private void handleSlotClick(int idx) {
+        if (Inventory.movingSlot == -1) Inventory.movingSlot = idx;
+        else { Inventory.swapItems(Inventory.movingSlot, idx); Inventory.movingSlot = -1; }
+    }
+    
+    private boolean inCircle(float px, float py, float cx, float cy, float r) {
+        float dx = px - cx, dy = py - cy; return dx*dx + dy*dy <= r*r;
     }
     
     private class OverlayView extends View {
@@ -436,7 +523,6 @@ public class MainActivity extends Activity {
             int slotSize = 100, hGap = 10;
             int startX = (W - (9 * slotSize + 8 * hGap)) / 2, startY = 150;
             
-            // Рюкзак (3x9)
             for (int row = 0; row < 3; row++) {
                 for (int i = 0; i < 9; i++) {
                     int sx = startX + i*(slotSize+hGap);
@@ -446,7 +532,6 @@ public class MainActivity extends Activity {
                 }
             }
             
-            // Хотбар (внизу инвентаря)
             int hotbarY = (int)(H - 200 * getUiScale());
             for (int i = 0; i < 9; i++) {
                 int sx = startX + i*(slotSize+hGap);
