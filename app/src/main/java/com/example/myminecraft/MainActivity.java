@@ -634,26 +634,38 @@ public class MainActivity extends Activity {
         }
         
         private void drawSlot(Canvas c, int sx, int sy, int slotSize, Inventory.Slot slot, boolean isSelected, boolean isMoving) {
-            Paint p = new Paint(Paint.ANTI_ALIAS_FLAG); p.setStyle(Paint.Style.FILL);
-            p.setColor(Color.argb(isSelected ? 220 : 100, 0, 0, 0));
-            c.drawRect(sx, sy, sx+slotSize, sy+slotSize, p);
-            c.drawRect(sx, sy, sx+slotSize, sy+slotSize, stroke);
-            
-            if (isMoving) {
-                Paint sel = new Paint(Paint.ANTI_ALIAS_FLAG); sel.setStyle(Paint.Style.STROKE); sel.setStrokeWidth(6f); sel.setColor(Color.YELLOW);
-                c.drawRect(sx, sy, sx+slotSize, sy+slotSize, sel);
+        if (isMoving) {
+            Paint sel = new Paint(Paint.ANTI_ALIAS_FLAG); sel.setStyle(Paint.Style.STROKE); sel.setStrokeWidth(5f); sel.setColor(Color.YELLOW);
+            c.drawRect(sx, sy, sx + slotSize, sy + slotSize, sel);
+        }
+        
+        if (slot.type != Block.AIR) {
+            int resId = 0;
+            switch(slot.type) {
+                case Block.GRASS: resId = com.example.myminecraft.R.drawable.grass_top; break;
+                case Block.DIRT: resId = com.example.myminecraft.R.drawable.dirt; break;
+                case Block.STONE: resId = com.example.myminecraft.R.drawable.stone; break;
+                case Block.WOOD: resId = com.example.myminecraft.R.drawable.wood_side; break;
+                case Block.LEAVES: resId = com.example.myminecraft.R.drawable.leaves; break;
+                case Block.PLANKS: resId = com.example.myminecraft.R.drawable.planks; break;
+                case Block.COBBLESTONE: resId = com.example.myminecraft.R.drawable.cobblestone; break;
+                case Block.MEAT: resId = com.example.myminecraft.R.drawable.sheep_face; break;
             }
-            
-            if (slot.type != Block.AIR) {
-                float[] col = Block.getUITopColor(slot.type);
-                p.setColor(Color.rgb((int)(col[0]*255), (int)(col[1]*255), (int)(col[2]*255)));
-                c.drawRect(sx+20, sy+20, sx+slotSize-20, sy+slotSize-20, p);
-                if (slot.count > 1) {
-                    text.setTextSize(30f); text.setTextAlign(Paint.Align.RIGHT);
-                    c.drawText(String.valueOf(slot.count), sx + slotSize - 5, sy + slotSize - 5, text);
+            if (resId != 0) {
+                android.graphics.Bitmap bmp = android.graphics.BitmapFactory.decodeResource(getResources(), resId);
+                if (bmp != null) {
+                    android.graphics.Rect src = new android.graphics.Rect(0, 0, bmp.getWidth(), bmp.getHeight());
+                    android.graphics.Rect dst = new android.graphics.Rect(sx + 5, sy + 5, sx + slotSize - 5, sy + slotSize - 5);
+                    c.drawBitmap(bmp, src, dst, null);
+                    bmp.recycle();
                 }
             }
+            if (slot.count > 1) {
+                text.setTextSize(slotSize * 0.3f); text.setTextAlign(Paint.Align.RIGHT);
+                c.drawText(String.valueOf(slot.count), sx + slotSize - 5, sy + slotSize - 5, text);
+            }
         }
+    }
         
         private void drawCrafting(Canvas c, int W, int H) {
             Paint dim = new Paint(); dim.setColor(Color.argb(220, 0, 0, 0)); c.drawRect(0, 0, W, H, dim);
@@ -684,33 +696,65 @@ public class MainActivity extends Activity {
         }
         
         private void drawInventory(Canvas c, int W, int H) {
-            Paint dim = new Paint(); dim.setColor(Color.argb(220, 0, 0, 0)); c.drawRect(0, 0, W, H, dim);
-            text.setTextSize(60f); text.setTextAlign(Paint.Align.CENTER); c.drawText("Инвентарь", W/2f, 100, text);
-            c.drawCircle(W - 60, 60, 45, bg); c.drawCircle(W - 60, 60, 45, stroke); c.drawText("X", W - 60, 75, text);
+        Paint dim = new Paint(); dim.setColor(Color.argb(180, 0, 0, 0)); c.drawRect(0, 0, W, H, dim);
+        android.graphics.Bitmap bgBitmap = android.graphics.BitmapFactory.decodeResource(getResources(), com.example.myminecraft.R.drawable.inventory_bg);
+        
+        if (bgBitmap != null) {
+            float scale = Math.min((float) W / bgBitmap.getWidth(), (float) H / bgBitmap.getHeight()) * 0.9f;
+            int bgW = (int)(bgBitmap.getWidth() * scale);
+            int bgH = (int)(bgBitmap.getHeight() * scale);
+            int left = (W - bgW) / 2, top = (H - bgH) / 2;
             
-            Paint btn = new Paint(); btn.setColor(Color.rgb(60, 180, 60));
-            c.drawRect(50, 60, 250, 120, btn);
-            c.drawRect(50, 60, 250, 120, stroke);
-            text.setTextSize(40f); text.setTextAlign(Paint.Align.CENTER); c.drawText("Крафт", 150, 105, text);
+            android.graphics.Rect dst = new android.graphics.Rect(left, top, left + bgW, top + bgH);
+            c.drawBitmap(bgBitmap, null, dst, null);
             
-            int slotSize = 100, hGap = 10;
-            int startX = (W - (9 * slotSize + 8 * hGap)) / 2, startY = 150;
+            text.setTextSize(60f); text.setTextAlign(Paint.Align.CENTER);
+            Paint p = new Paint(); p.setColor(Color.WHITE); p.setStyle(Paint.Style.STROKE); p.setStrokeWidth(6f);
+            c.drawCircle(left + bgW - 40, top + 40, 30, p);
+            c.drawText("X", left + bgW - 40, top + 62, text);
             
+            android.graphics.Bitmap skin = android.graphics.BitmapFactory.decodeResource(getResources(), com.example.myminecraft.R.drawable.skin);
+            if (skin != null) {
+                android.graphics.Rect srcFace = new android.graphics.Rect(8, 8, 16, 16);
+                android.graphics.Rect dstFace = new android.graphics.Rect(left + (int)(bgW * 0.12f), top + (int)(bgH * 0.08f), left + (int)(bgW * 0.24f), top + (int)(bgH * 0.28f));
+                c.drawBitmap(skin, srcFace, dstFace, null);
+                skin.recycle();
+            }
+
+            int slotSize = (int)(bgW * 0.09f);
+            int gap = (int)(bgW * 0.005f);
+            
+            int invStartX = left + (int)(bgW * 0.02f);
+            int invStartY = top + (int)(bgH * 0.48f);
             for (int row = 0; row < 3; row++) {
                 for (int i = 0; i < 9; i++) {
-                    int sx = startX + i*(slotSize+hGap);
-                    int sy = startY + row*(slotSize+hGap);
-                    int idx = 9 + row * 9 + i;
-                    drawSlot(c, sx, sy, slotSize, Inventory.slots[idx], false, idx == Inventory.movingSlot);
+                    int sx = invStartX + i * (slotSize + gap);
+                    int sy = invStartY + row * (slotSize + gap);
+                    drawSlot(c, sx, sy, slotSize, Inventory.slots[9 + row * 9 + i], false, 9 + row * 9 + i == Inventory.movingSlot);
                 }
             }
             
-            int hotbarY = (int)(H - 200 * getUiScale());
+            int hotbarY = top + (int)(bgH * 0.85f);
             for (int i = 0; i < 9; i++) {
-                int sx = startX + i*(slotSize+hGap);
+                int sx = invStartX + i * (slotSize + gap);
                 drawSlot(c, sx, hotbarY, slotSize, Inventory.slots[i], i == Inventory.selectedSlot, i == Inventory.movingSlot);
             }
+            
+            int craftX = left + (int)(bgW * 0.56f);
+            int craftY = top + (int)(bgH * 0.08f);
+            for (int i = 0; i < 4; i++) {
+                int sx = craftX + (i % 2) * (slotSize + gap);
+                int sy = craftY + (i / 2) * (slotSize + gap);
+                drawSlot(c, sx, sy, slotSize, Inventory.craftGrid[i], false, i + 36 == Inventory.movingSlot);
+            }
+            
+            int outX = left + (int)(bgW * 0.82f);
+            int outY = top + (int)(bgH * 0.13f);
+            drawSlot(c, outX, outY, slotSize, Inventory.craftOutput, false, 40 == Inventory.movingSlot);
+            
+            bgBitmap.recycle();
         }
+    }
         
         private void drawSettings(Canvas c, int W, int H) {
             Paint dim = new Paint(); dim.setColor(Color.argb(220, 0, 0, 0)); c.drawRect(0, 0, W, H, dim);
