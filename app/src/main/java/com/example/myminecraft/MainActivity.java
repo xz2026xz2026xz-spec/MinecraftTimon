@@ -656,7 +656,7 @@ public class MainActivity extends Activity {
                 case Block.MEAT: resId = com.example.myminecraft.R.drawable.sheep_face; break;
             }
             if (resId != 0) {
-                android.graphics.Bitmap bmp = android.graphics.BitmapFactory.decodeResource(c.getResources(), resId);
+                android.graphics.Bitmap bmp = android.graphics.BitmapFactory.decodeResource(getResources(), resId);
                 if (bmp != null) {
                     android.graphics.Rect src = new android.graphics.Rect(0, 0, bmp.getWidth(), bmp.getHeight());
                     android.graphics.Rect dst = new android.graphics.Rect(sx + 5, sy + 5, sx + slotSize - 5, sy + slotSize - 5);
