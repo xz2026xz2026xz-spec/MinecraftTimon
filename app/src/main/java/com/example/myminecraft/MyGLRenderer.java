@@ -279,4 +279,173 @@ public class MyGLRenderer implements GLSurfaceView.Renderer {
         GLES20.glDisableVertexAttribArray(positionHandle); GLES20.glDisableVertexAttribArray(colorHandle); GLES20.glDisableVertexAttribArray(texCoordHandle);
     }
     
+    @Override public void onDrawFrame(GL10 unused) {
+        // --- СМЕНА ДНЯ И НОЧИ ---
+        timeOfDay += 0.001f; // Скорость течения времени
+        if (timeOfDay > 1.0f) timeOfDay -= 1.0f;
+
+        float sunAngle = timeOfDay * 2f * (float)Math.PI;
+        float lightLevel = (float)Math.max(0.2, Math.sin(sunAngle) * 0.6 + 0.5); // От 0.2 (ночь) до 1.0 (день)
+        
+        // Меняем цвет неба
+        float skyR = 0.5f * lightLevel;
+        float skyG = 0.7f * lightLevel;
+        float skyB = 1.0f * lightLevel;
+        GLES20.glClearColor(skyR, skyG, skyB, 1.0f);
+
+        if (TextureManager.skinNeedsReload) {
+            TextureManager.loadPlayerSkin(ctx);
+            TextureManager.skinNeedsReload = false;
+        }
+
+        if (pendingSwitch != -1) {
+            int n = pendingSwitch;
+            pendingSwitch = -1;
+            if (n != currentWorld) doSwitchWorld(n);
+        }
+        
+        if (pendingDelete) {
+            pendingDelete = false;
+            if (saveFile.exists()) saveFile.delete();
+            loadOrGenerate(currentWorld);
+            rebuildAllChunks();
+        }
+        
+        GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT | GLES20.GL_DEPTH_BUFFER_BIT);
+        player.update(world);
+        for (Sheep s : world.sheepList) s.update(world);
+        for (Dog d : world.dogList) d.update(world);
+        
+        for (int i = world.droppedItems.size() - 1; i >= 0; i--) {
+            DroppedItem item = world.droppedItems.get(i);
+            item.update(world);
+            float dx = player.x - item.x, dy = player.y - item.y, dz = player.z - item.z;
+            if (dx*dx + dy*dy + dz*dz < 1.5f && item.pickupDelay == 0) {
+                Inventory.addItem(item.type); world.droppedItems.remove(i);
+            } else if (item.y > 500) world.droppedItems.remove(i);
+        }
+        
+        if (savePending) {
+            savePending = false;
+            final float px = player.x, py = player.y, pz = player.z, yw = player.yaw, pt = player.pitch;
+            final File f = saveFile; final World w = world;
+            new Thread(new Runnable() { @Override public void run() { w.saveToFile(f, px, py, pz, yw, pt); } }).start();
+        }
+        
+        float yawRad = (float)Math.toRadians(player.yaw), pitchRad = (float)Math.toRadians(player.pitch);
+        float cosPitch = (float)Math.cos(pitchRad);
+        float lookX = player.x + (float)Math.sin(yawRad) * cosPitch, lookY = player.y + player.getEyeHeight() + (float)Math.sin(pitchRad), lookZ = player.z - (float)Math.cos(yawRad) * cosPitch;
+        float camX = player.x, camY = player.y + player.getEyeHeight(), camZ = player.z;
+        
+        if (player.thirdPerson) {
+            float dist = 4.0f, step = 0.2f, curDist = 0;
+            float stepX = -(float)Math.sin(yawRad) * cosPitch * step, stepY = -(float)Math.sin(pitchRad) * step, stepZ = (float)Math.cos(yawRad) * cosPitch * step;
+            while (curDist < dist) {
+                float nextX = camX + stepX, nextY = camY + stepY, nextZ = camZ + stepZ;
+                if (Block.isSolid(world.getBlock((int)Math.floor(nextX), (int)Math.floor(nextY), (int)Math.floor(nextZ)))) break;
+                camX = nextX; camY = nextY; camZ = nextZ; curDist += step;
+            }
+        }
+        
+        Matrix.setLookAtM(viewMatrix, 0, camX, camY, camZ, lookX, lookY, lookZ, 0, 1, 0);
+        Matrix.multiplyMM(mvpMatrix, 0, projectionMatrix, 0, viewMatrix, 0);
+        
+        GLES20.glUseProgram(program);
+        mvpMatrixHandle = GLES20.glGetUniformLocation(program, "uMVPMatrix");
+        GLES20.glUniformMatrix4fv(mvpMatrixHandle, 1, false, mvpMatrix, 0);
+        lightHandle = GLES20.glGetUniformLocation(program, "uLightLevel");
+        GLES20.glUniform1f(lightHandle, lightLevel); // Передаем освещение в шейдер
+
+        positionHandle = GLES20.glGetAttribLocation(program, "vPosition");
+        colorHandle = GLES20.glGetAttribLocation(program, "vColor");
+        texCoordHandle = GLES20.glGetAttribLocation(program, "aTexCoord");
+        textureUniform = GLES20.glGetUniformLocation(program, "uTexture");
+        
+        GLES20.glActiveTexture(GLES20.GL_TEXTURE0);
+        GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, TextureManager.atlasId);
+        GLES20.glUniform1i(textureUniform, 0);
+        
+        for (Chunk chunk : chunks) {
+            if (chunk.getVertexCount() == 0) continue;
+            GLES20.glEnableVertexAttribArray(positionHandle); GLES20.glVertexAttribPointer(positionHandle, 3, GLES20.GL_FLOAT, false, 0, chunk.getVertexBuffer());
+            GLES20.glEnableVertexAttribArray(colorHandle); GLES20.glVertexAttribPointer(colorHandle, 3, GLES20.GL_FLOAT, false, 0, chunk.getColorBuffer());
+            GLES20.glEnableVertexAttribArray(texCoordHandle); GLES20.glVertexAttribPointer(texCoordHandle, 2, GLES20.GL_FLOAT, false, 0, chunk.getTextureBuffer());
+            GLES20.glDrawArrays(GLES20.GL_TRIANGLES, 0, chunk.getVertexCount());
+            GLES20.glDisableVertexAttribArray(positionHandle); GLES20.glDisableVertexAttribArray(colorHandle); GLES20.glDisableVertexAttribArray(texCoordHandle);
+        }
+        
+        for (Sheep s : world.sheepList) drawMob(s);
+        for (Dog d : world.dogList) drawMob(d);
+        for (DroppedItem item : world.droppedItems) drawDroppedItem(item);
+        
+        if (player.thirdPerson) {
+            drawPlayer(player.x, player.y, player.z, player.yaw, player.pitch, true);
+        }
+
+        // Отрисовка солнца и луны
+        float sunDist = 200f;
+        float sunX = player.x + (float)Math.cos(sunAngle) * sunDist;
+        float sunY = player.y + (float)Math.sin(sunAngle) * sunDist;
+        float sunZ = player.z;
+        
+        // Солнце светит, когда синус > 0
+        if (Math.sin(sunAngle) > -0.2f) {
+            drawSun(sunX, sunY, sunZ, true);
+        }
+        // Луна светит, когда синус < 0 (напротив солнца)
+        if (Math.sin(sunAngle) < 0.2f) {
+            drawSun(-sunX, -sunY, sunZ, false);
+        }
+    }
+    
+    @Override public void onSurfaceChanged(GL10 unused, int width, int height) {
+        GLES20.glViewport(0, 0, width, height);
+        Matrix.perspectiveM(projectionMatrix, 0, 70f, (float) width / height, 0.05f, 400f);
+    }
+    
+    private int loadShader(int type, String code) { int s = GLES20.glCreateShader(type); GLES20.glShaderSource(s, code); GLES20.glCompileShader(s); return s; }
+    
+    private int getTexIndex(byte block) {
+        switch (block) {
+            case Block.GRASS: return 0;
+            case Block.DIRT: return 2;
+            case Block.STONE: return 3;
+            case Block.WOOD: return 5;
+            case Block.LEAVES: return 6;
+            case Block.PLANKS: return 7;
+            case Block.COBBLESTONE: return 8;
+            default: return -1;
+        }
+    }
+    
+    public int raycastSheep() {
+        float yawRad = (float)Math.toRadians(player.yaw), pitchRad = (float)Math.toRadians(player.pitch);
+        float cosPitch = (float)Math.cos(pitchRad);
+        float dx = (float)Math.sin(yawRad) * cosPitch, dy = (float)Math.sin(pitchRad), dz = -(float)Math.cos(yawRad) * cosPitch;
+        float px = player.x, py = player.y + player.getEyeHeight(), pz = player.z;
+        for (int i = 0; i < 40; i++) {
+            for (int j = 0; j < world.sheepList.size(); j++) {
+                Sheep s = world.sheepList.get(j);
+                float ddx = px - s.x, ddy = py - (s.y + 0.5f), ddz = pz - s.z;
+                if (ddx*ddx + ddy*ddy + ddz*dz < 0.8f) return j;
+            }
+            px += dx * 0.1f; py += dy * 0.1f; pz += dz * 0.1f;
+        }
+        return -1;
+    }
+    
+    public int[] raycastBlock() {
+        float yawRad = (float)Math.toRadians(player.yaw), pitchRad = (float)Math.toRadians(player.pitch);
+        float cosPitch = (float)Math.cos(pitchRad);
+        float dx = (float)Math.sin(yawRad) * cosPitch, dy = (float)Math.sin(pitchRad), dz = -(float)Math.cos(yawRad) * cosPitch;
+        float px = player.x, py = player.y + player.getEyeHeight(), pz = player.z;
+        float prevX = px, prevY = py, prevZ = pz;
+        for (int i = 0; i < 80; i++) {
+            int bx = (int)Math.floor(px), by = (int)Math.floor(py), bz = (int)Math.floor(pz);
+            if (Block.isSolid(world.getBlock(bx, by, bz))) return new int[]{bx, by, bz, (int)Math.floor(prevX), (int)Math.floor(prevY), (int)Math.floor(prevZ)};
+            prevX = px; prevY = py; prevZ = pz;
+            px += dx * 0.1f; py += dy * 0.1f; pz += dz * 0.1f;
+        }
+        return null;
+    }
 }
