@@ -34,8 +34,9 @@ public class Dog {
                 moveX = 0; moveZ = 0;
             } else {
                 float angle = rnd.nextFloat() * 360;
-                moveX = (float)Math.cos(Math.toRadians(angle)) * 0.02f;
-                moveZ = (float)Math.sin(Math.toRadians(angle)) * 0.02f;
+                // ИСПРАВЛЕНО: sin для X, cos для Z
+                moveX = (float)Math.sin(Math.toRadians(angle)) * 0.02f;
+                moveZ = (float)Math.cos(Math.toRadians(angle)) * 0.02f;
                 yaw = angle;
             }
         }

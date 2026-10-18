@@ -29,13 +29,14 @@ public class Sheep {
 
         moveTimer -= 1;
         if (moveTimer <= 0) {
-            moveTimer = 100 + rnd.nextInt(150); // Дольше стоят на месте
+            moveTimer = 100 + rnd.nextInt(150);
             if (rnd.nextBoolean()) {
                 moveX = 0; moveZ = 0;
             } else {
                 float angle = rnd.nextFloat() * 360;
-                moveX = (float)Math.cos(Math.toRadians(angle)) * 0.015f; // Очень медленно
-                moveZ = (float)Math.sin(Math.toRadians(angle)) * 0.015f;
+                // ИСПРАВЛЕНО: sin для X, cos для Z
+                moveX = (float)Math.sin(Math.toRadians(angle)) * 0.015f; 
+                moveZ = (float)Math.cos(Math.toRadians(angle)) * 0.015f;
                 yaw = angle;
             }
         }

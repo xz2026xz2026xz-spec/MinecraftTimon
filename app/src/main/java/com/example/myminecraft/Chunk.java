@@ -93,17 +93,21 @@ public class Chunk {
         float tileStep = 1.0f / TextureManager.GRID_SIZE;
         int col = texIndex % TextureManager.GRID_SIZE;
         int row = texIndex / TextureManager.GRID_SIZE;
-        
-        // Отступаем от краев на 1 пиксель (чтобы не захватывать соседние текстуры)
-        float epsilon = 0.001f; 
+        float epsilon = 0.001f;
         
         float u1 = col * tileStep + epsilon;
         float u2 = (col + 1) * tileStep - epsilon;
         float v2 = 1.0f - (row * tileStep) - epsilon;
         float v1 = 1.0f - ((row + 1) * tileStep) + epsilon;
         
-        texCoords.add(u1); texCoords.add(v1); texCoords.add(u2); texCoords.add(v1); texCoords.add(u2); texCoords.add(v2);
-        texCoords.add(u1); texCoords.add(v1); texCoords.add(u2); texCoords.add(v2); texCoords.add(u1); texCoords.add(v2);
+        // ИСПРАВЛЕННЫЙ ПОРЯДОК UV-КООРДИНАТ
+        texCoords.add(u1); texCoords.add(v1); // BL
+        texCoords.add(u1); texCoords.add(v2); // TL
+        texCoords.add(u2); texCoords.add(v2); // TR
+        
+        texCoords.add(u1); texCoords.add(v1); // BL
+        texCoords.add(u2); texCoords.add(v2); // TR
+        texCoords.add(u2); texCoords.add(v1); // BR
     }
     
     public FloatBuffer getVertexBuffer() { return vertexBuffer; }

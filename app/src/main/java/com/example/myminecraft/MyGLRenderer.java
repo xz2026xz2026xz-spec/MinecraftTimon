@@ -14,10 +14,12 @@ import javax.microedition.khronos.egl.EGLConfig;
 import javax.microedition.khronos.opengles.GL10;
 
 public class MyGLRenderer implements GLSurfaceView.Renderer {
-    private static final String VERTEX_SHADER = "uniform mat4 uMVPMatrix; attribute vec4 vPosition; attribute vec4 vColor; attribute vec2 aTexCoord; varying vec4 vColorVarying; varying vec2 vTexCoord; void main() { gl_Position = uMVPMatrix * vPosition; vColorVarying = vColor; vTexCoord = aTexCoord; }";
-    private static final String FRAGMENT_SHADER = "precision mediump float; uniform sampler2D uTexture; varying vec4 vColorVarying; varying vec2 vTexCoord; void main() { if (vTexCoord.x < 0.0) { gl_FragColor = vColorVarying; } else { gl_FragColor = texture2D(uTexture, vTexCoord); } }";
+    private static final String VERTEX_SHADER = 
+        "uniform mat4 uMVPMatrix; attribute vec4 vPosition; attribute vec4 vColor; attribute vec2 aTexCoord; varying vec4 vColorVarying; varying vec2 vTexCoord; void main() { gl_Position = uMVPMatrix * vPosition; vColorVarying = vColor; vTexCoord = aTexCoord; }";
+    private static final String FRAGMENT_SHADER = 
+        "precision mediump float; uniform sampler2D uTexture; uniform float uLightLevel; varying vec4 vColorVarying; varying vec2 vTexCoord; void main() { vec4 baseColor = (vTexCoord.x < 0.0) ? vColorVarying : texture2D(uTexture, vTexCoord); gl_FragColor = baseColor * uLightLevel; }";
     
-    private int program, positionHandle, colorHandle, mvpMatrixHandle, texCoordHandle, textureUniform;
+    private int program, positionHandle, colorHandle, mvpMatrixHandle, texCoordHandle, textureUniform, lightHandle;
     private final float[] mvpMatrix = new float[16], projectionMatrix = new float[16], viewMatrix = new float[16], modelMatrix = new float[16], tempMatrix = new float[16];
     
     public World world;
@@ -26,6 +28,7 @@ public class MyGLRenderer implements GLSurfaceView.Renderer {
     public List<Chunk> chunks = new ArrayList<>();
     
     private PlayerModel playerModel;
+    public float timeOfDay = 0.3f; // 0.0 = восход, 0.5 = закат, 1.0 = полночь
     
     private final Context ctx;
     private File saveFile;
@@ -37,6 +40,7 @@ public class MyGLRenderer implements GLSurfaceView.Renderer {
     private FloatBuffer bodyVertexBuffer, headVertexBuffer;
     private FloatBuffer sheepBodyTex, sheepHeadTex, dogBodyTex, dogHeadTex;
     private FloatBuffer itemTexBuffer;
+    private FloatBuffer sunVertexBuffer;
     
     public MyGLRenderer(Context ctx) {
         this.ctx = ctx;
@@ -97,6 +101,13 @@ public class MyGLRenderer implements GLSurfaceView.Renderer {
         
         ByteBuffer hvb = ByteBuffer.allocateDirect(headVerts.length * 4); hvb.order(ByteOrder.nativeOrder());
         headVertexBuffer = hvb.asFloatBuffer(); headVertexBuffer.put(headVerts); headVertexBuffer.position(0);
+
+        // Простой куб для Солнца/Луны
+        float[] sunVerts = {
+            -0.5f,-0.5f, 0f,  0.5f,-0.5f, 0f,  0.5f, 0.5f, 0f, -0.5f,-0.5f, 0f,  0.5f, 0.5f, 0f, -0.5f, 0.5f, 0f
+        };
+        ByteBuffer svb = ByteBuffer.allocateDirect(sunVerts.length * 4); svb.order(ByteOrder.nativeOrder());
+        sunVertexBuffer = svb.asFloatBuffer(); sunVertexBuffer.put(sunVerts); sunVertexBuffer.position(0);
     }
     
     private void loadOrGenerate(int index) {
@@ -240,8 +251,161 @@ public class MyGLRenderer implements GLSurfaceView.Renderer {
         
         GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, TextureManager.atlasId);
     }
+
+    private void drawSun(float x, float y, float z, boolean isSun) {
+        Matrix.setIdentityM(modelMatrix, 0);
+        Matrix.translateM(modelMatrix, 0, x, y, z);
+        Matrix.scaleM(modelMatrix, 0, 30f, 30f, 30f); // Большой размер
+        Matrix.multiplyMM(tempMatrix, 0, viewMatrix, 0, modelMatrix, 0);
+        Matrix.multiplyMM(mvpMatrix, 0, projectionMatrix, 0, tempMatrix, 0);
+        GLES20.glUniformMatrix4fv(mvpMatrixHandle, 1, false, mvpMatrix, 0);
+
+        float[] color = isSun ? new float[]{1f, 1f, 0.5f} : new float[]{0.8f, 0.8f, 1f}; // Желтое солнце, белая луна
+        float[] cols = new float[18 * 3];
+        for(int i=0; i<18; i++) { cols[i*3]=color[0]; cols[i*3+1]=color[1]; cols[i*3+2]=color[2]; }
+        ByteBuffer cb = ByteBuffer.allocateDirect(cols.length * 4); cb.order(ByteOrder.nativeOrder());
+        FloatBuffer colorBuffer = cb.asFloatBuffer(); colorBuffer.put(cols); colorBuffer.position(0);
+
+        float[] tCoords = new float[36]; for(int i=0; i<36; i++) tCoords[i] = -1f;
+        ByteBuffer tb = ByteBuffer.allocateDirect(tCoords.length * 4); tb.order(ByteOrder.nativeOrder());
+        FloatBuffer texBuf = tb.asFloatBuffer(); texBuf.put(tCoords); texBuf.position(0);
+
+        GLES20.glEnableVertexAttribArray(positionHandle); GLES20.glVertexAttribPointer(positionHandle, 3, GLES20.GL_FLOAT, false, 0, sunVertexBuffer);
+        GLES20.glEnableVertexAttribArray(colorHandle); GLES20.glVertexAttribPointer(colorHandle, 3, GLES20.GL_FLOAT, false, 0, colorBuffer);
+        GLES20.glEnableVertexAttribArray(texCoordHandle); GLES20.glVertexAttribPointer(texCoordHandle, 2, GLES20.GL_FLOAT, false, 0, texBuf);
+        
+        GLES20.glDrawArrays(GLES20.GL_TRIANGLES, 0, 6);
+        
+        GLES20.glDisableVertexAttribArray(positionHandle); GLES20.glDisableVertexAttribArray(colorHandle); GLES20.glDisableVertexAttribArray(texCoordHandle);
+    }
+    
+    public void markDirty(int wx, int wy, int wz) {
+        for (Chunk c : chunks)
+            if (wx >= c.startX - 1 && wx < c.startX + c.sizeX + 1 && wy >= c.startY - 1 && wy < c.startY + c.sizeY + 1 && wz >= c.startZ - 1 && wz < c.startZ + c.sizeZ + 1)
+                c.buildMesh(world);
+        savePending = true;
+    }
+    
+    private void drawMobPart(float x, float y, float z, float yaw, FloatBuffer vb, FloatBuffer texBuf, boolean isHead) {
+        Matrix.setIdentityM(modelMatrix, 0);
+        Matrix.translateM(modelMatrix, 0, x, y + 0.5f, z);
+        Matrix.rotateM(modelMatrix, 0, -yaw, 0, 1, 0);
+        if (isHead) Matrix.translateM(modelMatrix, 0, 0, 0.3f, 0.6f);
+        Matrix.multiplyMM(tempMatrix, 0, viewMatrix, 0, modelMatrix, 0);
+        Matrix.multiplyMM(mvpMatrix, 0, projectionMatrix, 0, tempMatrix, 0);
+        
+        GLES20.glUniformMatrix4fv(mvpMatrixHandle, 1, false, mvpMatrix, 0);
+        GLES20.glEnableVertexAttribArray(positionHandle); GLES20.glVertexAttribPointer(positionHandle, 3, GLES20.GL_FLOAT, false, 0, vb);
+        GLES20.glDisableVertexAttribArray(colorHandle);
+        GLES20.glEnableVertexAttribArray(texCoordHandle); GLES20.glVertexAttribPointer(texCoordHandle, 2, GLES20.GL_FLOAT, false, 0, texBuf);
+        GLES20.glDrawArrays(GLES20.GL_TRIANGLES, 0, 36);
+        GLES20.glDisableVertexAttribArray(positionHandle); GLES20.glDisableVertexAttribArray(texCoordHandle);
+    }
+    
+    private void drawMob(Sheep s) {
+        drawMobPart(s.x, s.y, s.z, s.yaw, bodyVertexBuffer, sheepBodyTex, false);
+        drawMobPart(s.x, s.y, s.z, s.yaw, headVertexBuffer, sheepHeadTex, true);
+    }
+    
+    private void drawMob(Dog d) {
+        drawMobPart(d.x, d.y, d.z, d.yaw, bodyVertexBuffer, dogBodyTex, false);
+        drawMobPart(d.x, d.y, d.z, d.yaw, headVertexBuffer, dogHeadTex, true);
+    }
+    
+    private void drawDroppedItem(DroppedItem item) {
+        Matrix.setIdentityM(modelMatrix, 0);
+        Matrix.translateM(modelMatrix, 0, item.x, item.y + 0.15f, item.z);
+        Matrix.rotateM(modelMatrix, 0, item.rotation, 0, 1, 0);
+        Matrix.scaleM(modelMatrix, 0, 0.3f, 0.3f, 0.3f);
+        Matrix.multiplyMM(tempMatrix, 0, viewMatrix, 0, modelMatrix, 0);
+        Matrix.multiplyMM(mvpMatrix, 0, projectionMatrix, 0, tempMatrix, 0);
+        GLES20.glUniformMatrix4fv(mvpMatrixHandle, 1, false, mvpMatrix, 0);
+        
+        int col = getTexIndex(item.type) % TextureManager.GRID_SIZE;
+        int row = getTexIndex(item.type) / TextureManager.GRID_SIZE;
+        float tileStep = 1.0f / TextureManager.GRID_SIZE;
+        float epsilon = 0.001f;
+        float u1 = col * tileStep + epsilon;
+        float u2 = (col + 1) * tileStep - epsilon;
+        float v2 = 1.0f - (row * tileStep) - epsilon;
+        float v1 = 1.0f - ((row + 1) * tileStep) + epsilon;
+        
+        itemTexBuffer.position(0);
+        for(int i=0; i<6; i++) {
+            itemTexBuffer.put(u1); itemTexBuffer.put(v1); itemTexBuffer.put(u2); itemTexBuffer.put(v1); itemTexBuffer.put(u2); itemTexBuffer.put(v2);
+            itemTexBuffer.put(u1); itemTexBuffer.put(v1); itemTexBuffer.put(u2); itemTexBuffer.put(v2); itemTexBuffer.put(u1); itemTexBuffer.put(v2);
+        }
+        itemTexBuffer.position(0);
+        
+        GLES20.glEnableVertexAttribArray(positionHandle); GLES20.glVertexAttribPointer(positionHandle, 3, GLES20.GL_FLOAT, false, 0, bodyVertexBuffer);
+        GLES20.glDisableVertexAttribArray(colorHandle);
+        GLES20.glEnableVertexAttribArray(texCoordHandle); GLES20.glVertexAttribPointer(texCoordHandle, 2, GLES20.GL_FLOAT, false, 0, itemTexBuffer);
+        GLES20.glDrawArrays(GLES20.GL_TRIANGLES, 0, 36);
+        GLES20.glDisableVertexAttribArray(positionHandle); GLES20.glDisableVertexAttribArray(texCoordHandle);
+    }
+
+    private void drawPlayer(float x, float y, float z, float yaw, float pitch, boolean isLocal) {
+        if (TextureManager.skinTextureId == -1) return;
+
+        Matrix.setIdentityM(modelMatrix, 0);
+        Matrix.translateM(modelMatrix, 0, x, y + 0.9f, z);
+        Matrix.rotateM(modelMatrix, 0, -yaw, 0, 1, 0);
+        Matrix.multiplyMM(tempMatrix, 0, viewMatrix, 0, modelMatrix, 0);
+        Matrix.multiplyMM(mvpMatrix, 0, projectionMatrix, 0, tempMatrix, 0);
+        GLES20.glUniformMatrix4fv(mvpMatrixHandle, 1, false, mvpMatrix, 0);
+
+        GLES20.glEnableVertexAttribArray(positionHandle); GLES20.glVertexAttribPointer(positionHandle, 3, GLES20.GL_FLOAT, false, 0, playerModel.vertexBuffer);
+        GLES20.glDisableVertexAttribArray(colorHandle);
+        GLES20.glEnableVertexAttribArray(texCoordHandle); GLES20.glVertexAttribPointer(texCoordHandle, 2, GLES20.GL_FLOAT, false, 0, playerModel.texBuffer);
+        
+        GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, TextureManager.skinTextureId);
+        GLES20.glDrawArrays(GLES20.GL_TRIANGLES, 0, playerModel.vertexCount);
+        GLES20.glDisableVertexAttribArray(positionHandle); GLES20.glDisableVertexAttribArray(texCoordHandle);
+        
+        GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, TextureManager.atlasId);
+    }
+
+    private void drawSun(float x, float y, float z, boolean isSun) {
+        Matrix.setIdentityM(modelMatrix, 0);
+        Matrix.translateM(modelMatrix, 0, x, y, z);
+        Matrix.scaleM(modelMatrix, 0, 30f, 30f, 30f); // Большой размер
+        Matrix.multiplyMM(tempMatrix, 0, viewMatrix, 0, modelMatrix, 0);
+        Matrix.multiplyMM(mvpMatrix, 0, projectionMatrix, 0, tempMatrix, 0);
+        GLES20.glUniformMatrix4fv(mvpMatrixHandle, 1, false, mvpMatrix, 0);
+
+        float[] color = isSun ? new float[]{1f, 1f, 0.5f} : new float[]{0.8f, 0.8f, 1f}; // Желтое солнце, белая луна
+        float[] cols = new float[18 * 3];
+        for(int i=0; i<18; i++) { cols[i*3]=color[0]; cols[i*3+1]=color[1]; cols[i*3+2]=color[2]; }
+        ByteBuffer cb = ByteBuffer.allocateDirect(cols.length * 4); cb.order(ByteOrder.nativeOrder());
+        FloatBuffer colorBuffer = cb.asFloatBuffer(); colorBuffer.put(cols); colorBuffer.position(0);
+
+        float[] tCoords = new float[36]; for(int i=0; i<36; i++) tCoords[i] = -1f;
+        ByteBuffer tb = ByteBuffer.allocateDirect(tCoords.length * 4); tb.order(ByteOrder.nativeOrder());
+        FloatBuffer texBuf = tb.asFloatBuffer(); texBuf.put(tCoords); texBuf.position(0);
+
+        GLES20.glEnableVertexAttribArray(positionHandle); GLES20.glVertexAttribPointer(positionHandle, 3, GLES20.GL_FLOAT, false, 0, sunVertexBuffer);
+        GLES20.glEnableVertexAttribArray(colorHandle); GLES20.glVertexAttribPointer(colorHandle, 3, GLES20.GL_FLOAT, false, 0, colorBuffer);
+        GLES20.glEnableVertexAttribArray(texCoordHandle); GLES20.glVertexAttribPointer(texCoordHandle, 2, GLES20.GL_FLOAT, false, 0, texBuf);
+        
+        GLES20.glDrawArrays(GLES20.GL_TRIANGLES, 0, 6);
+        
+        GLES20.glDisableVertexAttribArray(positionHandle); GLES20.glDisableVertexAttribArray(colorHandle); GLES20.glDisableVertexAttribArray(texCoordHandle);
+    }
     
     @Override public void onDrawFrame(GL10 unused) {
+        // --- СМЕНА ДНЯ И НОЧИ ---
+        timeOfDay += 0.001f; // Скорость течения времени
+        if (timeOfDay > 1.0f) timeOfDay -= 1.0f;
+
+        float sunAngle = timeOfDay * 2f * (float)Math.PI;
+        float lightLevel = (float)Math.max(0.2, Math.sin(sunAngle) * 0.6 + 0.5); // От 0.2 (ночь) до 1.0 (день)
+        
+        // Меняем цвет неба
+        float skyR = 0.5f * lightLevel;
+        float skyG = 0.7f * lightLevel;
+        float skyB = 1.0f * lightLevel;
+        GLES20.glClearColor(skyR, skyG, skyB, 1.0f);
+
         if (TextureManager.skinNeedsReload) {
             TextureManager.loadPlayerSkin(ctx);
             TextureManager.skinNeedsReload = false;
@@ -302,6 +466,9 @@ public class MyGLRenderer implements GLSurfaceView.Renderer {
         GLES20.glUseProgram(program);
         mvpMatrixHandle = GLES20.glGetUniformLocation(program, "uMVPMatrix");
         GLES20.glUniformMatrix4fv(mvpMatrixHandle, 1, false, mvpMatrix, 0);
+        lightHandle = GLES20.glGetUniformLocation(program, "uLightLevel");
+        GLES20.glUniform1f(lightHandle, lightLevel); // Передаем освещение в шейдер
+
         positionHandle = GLES20.glGetAttribLocation(program, "vPosition");
         colorHandle = GLES20.glGetAttribLocation(program, "vColor");
         texCoordHandle = GLES20.glGetAttribLocation(program, "aTexCoord");
@@ -326,6 +493,21 @@ public class MyGLRenderer implements GLSurfaceView.Renderer {
         
         if (player.thirdPerson) {
             drawPlayer(player.x, player.y, player.z, player.yaw, player.pitch, true);
+        }
+
+        // Отрисовка солнца и луны
+        float sunDist = 200f;
+        float sunX = player.x + (float)Math.cos(sunAngle) * sunDist;
+        float sunY = player.y + (float)Math.sin(sunAngle) * sunDist;
+        float sunZ = player.z;
+        
+        // Солнце светит, когда синус > 0
+        if (Math.sin(sunAngle) > -0.2f) {
+            drawSun(sunX, sunY, sunZ, true);
+        }
+        // Луна светит, когда синус < 0 (напротив солнца)
+        if (Math.sin(sunAngle) < 0.2f) {
+            drawSun(-sunX, -sunY, sunZ, false);
         }
     }
     
