@@ -634,13 +634,9 @@ public class MainActivity extends Activity {
         }
         
         private void drawSlot(Canvas c, int sx, int sy, int slotSize, Inventory.Slot slot, boolean isSelected, boolean isMoving) {
-        Paint p = new Paint(Paint.ANTI_ALIAS_FLAG); p.setStyle(Paint.Style.FILL);
-        p.setColor(Color.argb(isSelected ? 220 : 50, 0, 0, 0));
-        c.drawRect(sx, sy, sx+slotSize, sy+slotSize, p);
-        
         if (isMoving) {
-            Paint sel = new Paint(Paint.ANTI_ALIAS_FLAG); sel.setStyle(Paint.Style.STROKE); sel.setStrokeWidth(6f); sel.setColor(Color.YELLOW);
-            c.drawRect(sx, sy, sx+slotSize, sy+slotSize, sel);
+            Paint sel = new Paint(Paint.ANTI_ALIAS_FLAG); sel.setStyle(Paint.Style.STROKE); sel.setStrokeWidth(5f); sel.setColor(Color.YELLOW);
+            c.drawRect(sx, sy, sx + slotSize, sy + slotSize, sel);
         }
         
         if (slot.type != Block.AIR) {
@@ -664,7 +660,6 @@ public class MainActivity extends Activity {
                     bmp.recycle();
                 }
             }
-            
             if (slot.count > 1) {
                 text.setTextSize(slotSize * 0.3f); text.setTextAlign(Paint.Align.RIGHT);
                 c.drawText(String.valueOf(slot.count), sx + slotSize - 5, sy + slotSize - 5, text);
@@ -702,39 +697,59 @@ public class MainActivity extends Activity {
         
         private void drawInventory(Canvas c, int W, int H) {
         Paint dim = new Paint(); dim.setColor(Color.argb(180, 0, 0, 0)); c.drawRect(0, 0, W, H, dim);
-        android.graphics.Bitmap bg = android.graphics.BitmapFactory.decodeResource(getResources(), com.example.myminecraft.R.drawable.inventory_bg);
-        if (bg != null) {
-            float scale = Math.min((float) W / bg.getWidth(), (float) H / bg.getHeight()) * 0.9f;
-            int bgW = (int)(bg.getWidth() * scale);
-            int bgH = (int)(bg.getHeight() * scale);
+        
+        if (bgBitmap != null) {
+            float scale = Math.min((float) W / bgBitmap.getWidth(), (float) H / bgBitmap.getHeight()) * 0.9f;
+            int bgW = (int)(bgBitmap.getWidth() * scale);
+            int bgH = (int)(bgBitmap.getHeight() * scale);
             int left = (W - bgW) / 2, top = (H - bgH) / 2;
+            
             android.graphics.Rect dst = new android.graphics.Rect(left, top, left + bgW, top + bgH);
-            c.drawBitmap(bg, null, dst, null);
+            c.drawBitmap(bgBitmap, null, dst, null);
             
             text.setTextSize(60f); text.setTextAlign(Paint.Align.CENTER);
             Paint p = new Paint(); p.setColor(Color.WHITE); p.setStyle(Paint.Style.STROKE); p.setStrokeWidth(6f);
             c.drawCircle(left + bgW - 40, top + 40, 30, p);
             c.drawText("X", left + bgW - 40, top + 62, text);
             
-            int slotSize = (int)(bgW * 0.091f);
+            android.graphics.Bitmap skin = android.graphics.BitmapFactory.decodeResource(getResources(), com.example.myminecraft.R.drawable.skin);
+            if (skin != null) {
+                android.graphics.Rect srcFace = new android.graphics.Rect(8, 8, 16, 16);
+                android.graphics.Rect dstFace = new android.graphics.Rect(left + (int)(bgW * 0.12f), top + (int)(bgH * 0.08f), left + (int)(bgW * 0.24f), top + (int)(bgH * 0.28f));
+                c.drawBitmap(skin, srcFace, dstFace, null);
+                skin.recycle();
+            }
+
+            int slotSize = (int)(bgW * 0.09f);
             int gap = (int)(bgW * 0.005f);
-            int startX = left + (int)(bgW * 0.02f);
-            int startY = top + (int)(bgH * 0.33f);
             
+            int invStartX = left + (int)(bgW * 0.02f);
+            int invStartY = top + (int)(bgH * 0.48f);
             for (int row = 0; row < 3; row++) {
                 for (int i = 0; i < 9; i++) {
-                    int sx = startX + i * (slotSize + gap);
-                    int sy = startY + row * (slotSize + gap);
+                    int sx = invStartX + i * (slotSize + gap);
+                    int sy = invStartY + row * (slotSize + gap);
                     drawSlot(c, sx, sy, slotSize, Inventory.slots[9 + row * 9 + i], false, 9 + row * 9 + i == Inventory.movingSlot);
                 }
             }
             
-            int hotbarY = top + (int)(bgH * 0.76f);
+            int hotbarY = top + (int)(bgH * 0.85f);
             for (int i = 0; i < 9; i++) {
-                int sx = startX + i * (slotSize + gap);
+                int sx = invStartX + i * (slotSize + gap);
                 drawSlot(c, sx, hotbarY, slotSize, Inventory.slots[i], i == Inventory.selectedSlot, i == Inventory.movingSlot);
             }
-            bg.recycle();
+            
+            int craftX = left + (int)(bgW * 0.56f);
+            int craftY = top + (int)(bgH * 0.08f);
+            for (int i = 0; i < 4; i++) {
+                int sx = craftX + (i % 2) * (slotSize + gap);
+                int sy = craftY + (i / 2) * (slotSize + gap);
+                drawSlot(c, sx, sy, slotSize, Inventory.craftGrid[i], false, i + 36 == Inventory.movingSlot);
+            }
+            
+            int outX = left + (int)(bgW * 0.82f);
+            int outY = top + (int)(bgH * 0.13f);
+            drawSlot(c, outX, outY, slotSize, Inventory.craftOutput, false, 40 == Inventory.movingSlot);
         }
     }
         
