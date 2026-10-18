@@ -200,7 +200,7 @@ public class MainActivity extends Activity {
             if (craftingOpen) { handleCraftingUIDown(x, y, W, H); overlay.invalidate(); return true; }
             
             if (inventoryOpen) {
-                if (inCircle(x, y, (int)(getWidth()/2 + (getWidth()*0.9f*bgBitmap.getWidth()/bgBitmap.getHeight())/2) - 40, (int)(getHeight() - getHeight()*0.9f)/2 + 40, 45 * scale)) { inventoryOpen = false; Inventory.movingSlot = -1; return true; }
+                if (inCircle(x, y, W - 150, 150, 60 * scale)) { inventoryOpen = false; Inventory.movingSlot = -1; return true; }
                 if (x > 50 && x < 250 && y > 60 && y < 120) { craftingOpen = true; Inventory.movingSlot = -1; inventoryOpen = false; Inventory.movingSlot = -1; return true; }
                 
                 int slotSize = 100, hGap = 10;
@@ -633,7 +633,16 @@ public class MainActivity extends Activity {
             text.setTextSize(size * 0.6f); text.setTextAlign(Paint.Align.CENTER); c.drawText(label, x + size/2f, y + size/2f + size * 0.2f, text);
         }
         
-        private void drawSlot(Canvas c, int sx, int sy, int slotSize, Inventory.Slot slot, boolean isSelected, boolean isMoving) {
+        
+    private java.util.HashMap<Integer, android.graphics.Bitmap> bitmapCache = new java.util.HashMap<>();
+    private android.graphics.Bitmap getCachedBitmap(int resId) {
+        if (bitmapCache.containsKey(resId)) return bitmapCache.get(resId);
+        android.graphics.Bitmap bmp = android.graphics.BitmapFactory.decodeResource(getResources(), resId);
+        bitmapCache.put(resId, bmp);
+        return bmp;
+    }
+
+    private void drawSlot(Canvas c, int sx, int sy, int slotSize, Inventory.Slot slot, boolean isSelected, boolean isMoving) {
         // Рисуем серый фон слота
         Paint bgPaint = new Paint(Paint.ANTI_ALIAS_FLAG); bgPaint.setStyle(Paint.Style.FILL);
         bgPaint.setColor(Color.argb(150, 80, 80, 80)); // Темно-серый полупрозрачный
@@ -662,12 +671,12 @@ public class MainActivity extends Activity {
                 case Block.MEAT: resId = com.example.myminecraft.R.drawable.sheep_face; break;
             }
             if (resId != 0) {
-                android.graphics.Bitmap bmp = android.graphics.BitmapFactory.decodeResource(getResources(), resId);
+                // Оптимизация: кешируем картинки, чтобы не загружать их каждый кадр
+                android.graphics.Bitmap bmp = getCachedBitmap(resId);
                 if (bmp != null) {
                     android.graphics.Rect src = new android.graphics.Rect(0, 0, bmp.getWidth(), bmp.getHeight());
                     android.graphics.Rect dst = new android.graphics.Rect(sx + 5, sy + 5, sx + slotSize - 5, sy + slotSize - 5);
                     c.drawBitmap(bmp, src, dst, null);
-                    bmp.recycle();
                 }
             }
             if (slot.count > 1) {

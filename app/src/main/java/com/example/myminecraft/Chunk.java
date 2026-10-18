@@ -10,10 +10,15 @@ public class Chunk {
     public final int startX, startY, startZ, sizeX, sizeY, sizeZ;
     private FloatBuffer vertexBuffer, colorBuffer, textureBuffer;
     private int vertexCount = 0;
+    public float centerX, centerY, centerZ, radius;
     
     public Chunk(int startX, int startY, int startZ, int sizeX, int sizeY, int sizeZ) {
         this.startX = startX; this.startY = startY; this.startZ = startZ;
         this.sizeX = sizeX; this.sizeY = sizeY; this.sizeZ = sizeZ;
+        this.centerX = startX + sizeX / 2f;
+        this.centerY = startY + sizeY / 2f;
+        this.centerZ = startZ + sizeZ / 2f;
+        this.radius = (float)Math.sqrt(sizeX*sizeX + sizeY*sizeY + sizeZ*sizeZ) / 2f + 2.0f;
     }
     
     public void buildMesh(World world) {

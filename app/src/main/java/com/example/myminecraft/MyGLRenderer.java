@@ -18,6 +18,7 @@ public class MyGLRenderer implements GLSurfaceView.Renderer {
     private static final String FRAGMENT_SHADER = "precision mediump float; uniform sampler2D uTexture; varying vec4 vColorVarying; varying vec2 vTexCoord; void main() { if (vTexCoord.x < 0.0) { gl_FragColor = vColorVarying; } else { gl_FragColor = texture2D(uTexture, vTexCoord); } }";
     
     private int program, positionHandle, colorHandle, mvpMatrixHandle, texCoordHandle, textureUniform;
+    private Frustum frustum = new Frustum();
     private final float[] mvpMatrix = new float[16], projectionMatrix = new float[16], viewMatrix = new float[16], modelMatrix = new float[16], tempMatrix = new float[16];
     
     public World world;
@@ -298,6 +299,7 @@ public class MyGLRenderer implements GLSurfaceView.Renderer {
         
         Matrix.setLookAtM(viewMatrix, 0, camX, camY, camZ, lookX, lookY, lookZ, 0, 1, 0);
         Matrix.multiplyMM(mvpMatrix, 0, projectionMatrix, 0, viewMatrix, 0);
+        frustum.update(mvpMatrix);
         
         GLES20.glUseProgram(program);
         mvpMatrixHandle = GLES20.glGetUniformLocation(program, "uMVPMatrix");
@@ -313,6 +315,7 @@ public class MyGLRenderer implements GLSurfaceView.Renderer {
         
         for (Chunk chunk : chunks) {
             if (chunk.getVertexCount() == 0) continue;
+            if (!frustum.testSphere(chunk.centerX, chunk.centerY, chunk.centerZ, chunk.radius)) continue;
             GLES20.glEnableVertexAttribArray(positionHandle); GLES20.glVertexAttribPointer(positionHandle, 3, GLES20.GL_FLOAT, false, 0, chunk.getVertexBuffer());
             GLES20.glEnableVertexAttribArray(colorHandle); GLES20.glVertexAttribPointer(colorHandle, 3, GLES20.GL_FLOAT, false, 0, chunk.getColorBuffer());
             GLES20.glEnableVertexAttribArray(texCoordHandle); GLES20.glVertexAttribPointer(texCoordHandle, 2, GLES20.GL_FLOAT, false, 0, chunk.getTextureBuffer());
