@@ -26,6 +26,8 @@ import android.widget.FrameLayout;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.InputStream;
+import java.util.ArrayList;
+import java.util.List;
 
 public class MainActivity extends Activity {
     private GLSurfaceView glView;
@@ -52,6 +54,9 @@ public class MainActivity extends Activity {
     private float settingsScrollY = 0f;
     private float lastScrollY = 0f;
     private boolean isScrollingSettings = false;
+    
+    private List<Integer> swipedSlots = new ArrayList<>();
+    private int dragOriginalCount = 0;
     
     @Override protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -163,7 +168,7 @@ public class MainActivity extends Activity {
                 Bitmap scaled = Bitmap.createScaledBitmap(bmp, 256, 256, true);
                 FileOutputStream fos = openFileOutput("skin.png", Context.MODE_PRIVATE);
                 scaled.compress(Bitmap.CompressFormat.PNG, 100, fos); fos.close();
-                loadSkin(); overlay.invalidate();
+                loadSkin(); TextureManager.skinNeedsReload = true; overlay.invalidate();
             } catch (Exception e) { }
         }
     }
@@ -196,7 +201,7 @@ public class MainActivity extends Activity {
             
             if (inventoryOpen) {
                 if (inCircle(x, y, W - 60, 60, 45 * scale)) { inventoryOpen = false; Inventory.movingSlot = -1; return true; }
-                if (x > W/2 + 150 && x < W/2 + 350 && y > 60 && y < 120) { craftingOpen = true; inventoryOpen = false; Inventory.movingSlot = -1; return true; }
+                if (x > 50 && x < 250 && y > 60 && y < 120) { craftingOpen = true; inventoryOpen = false; Inventory.movingSlot = -1; return true; }
                 
                 int slotSize = 100, hGap = 10;
                 int invStartX = (W - (9 * slotSize + 8 * hGap)) / 2, invStartY = 150;
@@ -206,7 +211,18 @@ public class MainActivity extends Activity {
                         int sx = invStartX + i*(slotSize+hGap);
                         int sy = invStartY + row*(slotSize+hGap);
                         if (x >= sx && x <= sx + slotSize && y >= sy && y <= sy + slotSize) {
-                            handleSlotClick(9 + row * 9 + i); return true;
+                            int idx = 9 + row * 9 + i;
+                            if (Inventory.movingSlot == -1) { 
+                                if (Inventory.slots[idx].type != Block.AIR) {
+                                    Inventory.movingSlot = idx; 
+                                    dragOriginalCount = Inventory.slots[idx].count;
+                                    swipedSlots.clear();
+                                }
+                            } else { 
+                                if (Inventory.movingSlot == idx) Inventory.movingSlot = -1; 
+                                else { Inventory.swapItems(Inventory.movingSlot, idx); Inventory.movingSlot = -1; }
+                            }
+                            return true;
                         }
                     }
                 }
@@ -214,7 +230,17 @@ public class MainActivity extends Activity {
                 for (int i = 0; i < 9; i++) {
                     int sx = invStartX + i*(slotSize+hGap);
                     if (x >= sx && x <= sx + slotSize && y >= hotbarY && y <= hotbarY + slotSize) {
-                        handleSlotClick(i); return true;
+                        if (Inventory.movingSlot == -1) { 
+                            if (Inventory.slots[i].type != Block.AIR) {
+                                Inventory.movingSlot = i; 
+                                dragOriginalCount = Inventory.slots[i].count;
+                                swipedSlots.clear();
+                            }
+                        } else { 
+                            if (Inventory.movingSlot == i) Inventory.movingSlot = -1; 
+                            else { Inventory.swapItems(Inventory.movingSlot, i); Inventory.movingSlot = -1; }
+                        }
+                        return true;
                     }
                 }
                 return true;
@@ -228,14 +254,52 @@ public class MainActivity extends Activity {
             else if (inBtn(x, y, cx1, cy1, bSize) && bSwordId == -1) { bSwordId = pId; doAction(true); }
             else if (inBtn(x, y, cx2, cy1, bSize) && bJumpId == -1) { bJumpId = pId; renderer.player.jump = true; }
             else if (inBtn(x, y, cx1, cy2, bSize) && bSprintId == -1) { bSprintId = pId; renderer.player.sprinting = true; }
-            else if (inBtn(x, y, cx2, cy2, bSize) && bDropId == -1) { bDropId = pId; dropCurrentItem(); } // ВЫБРОС
+            else if (inBtn(x, y, cx2, cy2, bSize) && bDropId == -1) { bDropId = pId; dropCurrentItem(); }
             else if (inBtn(x, y, cx1, cy3, bSize) && bPlaceId == -1) { bPlaceId = pId; doAction(false); }
             else if (inBtn(x, y, cx2, cy3, bSize) && bSneakId == -1) { bSneakId = pId; renderer.player.sneaking = true; }
             else if (!isJoySide && lookPointerId == -1) { lookPointerId = pId; lastSwipeX = x; lastSwipeY = y; }
             overlay.invalidate();
         } 
         else if (action == MotionEvent.ACTION_MOVE) {
-            if (inventoryOpen || craftingOpen) return true;
+            if (inventoryOpen && Inventory.movingSlot != -1) {
+                int slotSize = 100, hGap = 10;
+                int invStartX = (W - (9 * slotSize + 8 * hGap)) / 2, invStartY = 150;
+                float x = event.getX(index), y = event.getY(index);
+                int currentSlot = -1;
+                
+                for (int row = 0; row < 3; row++) {
+                    for (int i = 0; i < 9; i++) {
+                        int sx = invStartX + i*(slotSize+hGap);
+                        int sy = invStartY + row*(slotSize+hGap);
+                        if (x >= sx && x <= sx + slotSize && y >= sy && y <= sy + slotSize) currentSlot = 9 + row * 9 + i;
+                    }
+                }
+                int hotbarY = (int)(H - 200 * scale);
+                for (int i = 0; i < 9; i++) {
+                    int sx = invStartX + i*(slotSize+hGap);
+                    if (x >= sx && x <= sx + slotSize && y >= hotbarY && y <= hotbarY + slotSize) currentSlot = i;
+                }
+                
+                byte itemType = Inventory.slots[Inventory.movingSlot].type;
+                if (currentSlot != -1 && currentSlot != Inventory.movingSlot && !swipedSlots.contains(currentSlot) && itemType != Block.AIR) {
+                    if (Inventory.slots[currentSlot].type == Block.AIR || Inventory.slots[currentSlot].type == itemType) {
+                        swipedSlots.add(currentSlot);
+                        int totalSlots = swipedSlots.size() + 1;
+                        int amount = dragOriginalCount / totalSlots;
+                        int remainder = dragOriginalCount % totalSlots;
+                        
+                        Inventory.slots[Inventory.movingSlot].count = remainder;
+                        if (remainder == 0) Inventory.slots[Inventory.movingSlot].type = Block.AIR;
+                        
+                        for (int s : swipedSlots) {
+                            Inventory.slots[s].type = itemType;
+                            Inventory.slots[s].count = amount;
+                        }
+                    }
+                }
+                overlay.invalidate();
+                return true;
+            }
 
             if (settingsOpen) {
                 if (isScrollingSettings) {
@@ -248,6 +312,7 @@ public class MainActivity extends Activity {
                 }
                 return true;
             }
+            if (craftingOpen) return true;
 
             for (int i = 0; i < event.getPointerCount(); i++) {
                 int pId = event.getPointerId(i);
@@ -271,8 +336,12 @@ public class MainActivity extends Activity {
             overlay.invalidate();
         } 
         else if (action == MotionEvent.ACTION_UP || action == MotionEvent.ACTION_POINTER_UP) {
-            if (inventoryOpen || craftingOpen) return true;
+            if (inventoryOpen) {
+                if (!swipedSlots.isEmpty()) { Inventory.movingSlot = -1; swipedSlots.clear(); }
+                return true;
+            }
             if (settingsOpen) { isScrollingSettings = false; return true; }
+            if (craftingOpen) return true;
             
             int pId = event.getPointerId(index);
             if (pId == movePointerId) { movePointerId = -1; renderer.player.moveX = 0; renderer.player.moveZ = 0; }
@@ -328,15 +397,6 @@ public class MainActivity extends Activity {
                     }
                 }
             }
-        }
-    }
-    
-    private void handleSlotClick(int idx) {
-        if (Inventory.movingSlot == -1) {
-            if (Inventory.slots[idx].type != Block.AIR) Inventory.movingSlot = idx;
-        } else {
-            if (Inventory.movingSlot == idx) Inventory.movingSlot = -1; 
-            else { Inventory.swapItems(Inventory.movingSlot, idx); Inventory.movingSlot = -1; }
         }
     }
     
@@ -628,6 +688,11 @@ public class MainActivity extends Activity {
             text.setTextSize(60f); text.setTextAlign(Paint.Align.CENTER); c.drawText("Инвентарь", W/2f, 100, text);
             c.drawCircle(W - 60, 60, 45, bg); c.drawCircle(W - 60, 60, 45, stroke); c.drawText("X", W - 60, 75, text);
             
+            Paint btn = new Paint(); btn.setColor(Color.rgb(60, 180, 60));
+            c.drawRect(50, 60, 250, 120, btn);
+            c.drawRect(50, 60, 250, 120, stroke);
+            text.setTextSize(40f); text.setTextAlign(Paint.Align.CENTER); c.drawText("Крафт", 150, 105, text);
+            
             int slotSize = 100, hGap = 10;
             int startX = (W - (9 * slotSize + 8 * hGap)) / 2, startY = 150;
             
@@ -640,19 +705,11 @@ public class MainActivity extends Activity {
                 }
             }
             
-            Paint btn = new Paint(); btn.setColor(Color.rgb(60, 180, 60));
-            c.drawRect(W/2 + 150, 60, W/2 + 350, 120, btn);
-            c.drawRect(W/2 + 150, 60, W/2 + 350, 120, stroke);
-            text.setTextSize(40f); text.setTextAlign(Paint.Align.CENTER); c.drawText("Крафт", W/2 + 250, 105, text);
-            
             int hotbarY = (int)(H - 200 * getUiScale());
             for (int i = 0; i < 9; i++) {
                 int sx = startX + i*(slotSize+hGap);
                 drawSlot(c, sx, hotbarY, slotSize, Inventory.slots[i], i == Inventory.selectedSlot, i == Inventory.movingSlot);
             }
-            
-            int cx = W/2 + 150, cy = H - 250;
-            if (skinBitmap != null) c.drawBitmap(skinBitmap, null, new Rect(cx-100, cy-100, cx+100, cy+100), skinPaint);
         }
         
         private void drawSettings(Canvas c, int W, int H) {
