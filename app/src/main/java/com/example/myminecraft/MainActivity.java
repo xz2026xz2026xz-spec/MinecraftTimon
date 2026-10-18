@@ -220,7 +220,7 @@ public class MainActivity extends Activity {
                                 }
                             } else { 
                                 if (Inventory.movingSlot == idx) Inventory.movingSlot = -1; 
-                                else { Inventory.swapItems(Inventory.movingSlot, idx); Inventory.movingSlot = -1; }
+                                else { Inventory.swapSlots(Inventory.movingSlot, idx); Inventory.movingSlot = -1; }
                             }
                             return true;
                         }
@@ -238,7 +238,7 @@ public class MainActivity extends Activity {
                             }
                         } else { 
                             if (Inventory.movingSlot == i) Inventory.movingSlot = -1; 
-                            else { Inventory.swapItems(Inventory.movingSlot, i); Inventory.movingSlot = -1; }
+                            else { Inventory.swapSlots(Inventory.movingSlot, i); Inventory.movingSlot = -1; }
                         }
                         return true;
                     }
