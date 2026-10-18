@@ -15,6 +15,8 @@ public class NetworkManager {
     
     public String myName = "Player_" + (int)(Math.random() * 9000 + 1000);
     public List<String> playerNames = new ArrayList<>();
+    public java.util.Map<String, RemotePlayer> otherPlayers = new java.util.concurrent.ConcurrentHashMap<>();
+    public java.util.List<RemotePlayer> remotePlayersList = new java.util.ArrayList<>();
     
     public static class ChatMessage {
         public String text;
@@ -101,6 +103,15 @@ public class NetworkManager {
         }
     }
     
+    
+    public void sendPosition(float x, float y, float z, float yaw, float pitch) {
+        if (!isConnected || out == null) return;
+        try { 
+            out.writeInt(5); out.writeFloat(x); out.writeFloat(y); out.writeFloat(z); 
+            out.writeFloat(yaw); out.writeFloat(pitch); 
+        } catch (Exception e) {}
+    }
+
     public void sendChat(String msg) {
         addChatMessage(myName + ": " + msg);
         if (!isConnected || out == null) return;
@@ -140,6 +151,15 @@ public class NetworkManager {
         }
     }
     
+    
+    private void broadcastPosition(String name, float x, float y, float z, float yaw, float pitch) {
+        synchronized (clientOutputs) {
+            for (DataOutputStream o : clientOutputs) {
+                try { o.writeInt(5); o.writeFloat(x); o.writeFloat(y); o.writeFloat(z); o.writeFloat(yaw); o.writeFloat(pitch); o.writeUTF(name); } catch (Exception e) {}
+            }
+        }
+    }
+
     public void broadcastPlayerList() {
         StringBuilder sb = new StringBuilder();
         synchronized(playerNames) {

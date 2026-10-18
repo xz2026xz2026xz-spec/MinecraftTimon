@@ -176,7 +176,7 @@ public class MyGLRenderer implements GLSurfaceView.Renderer {
     private void drawMobPart(float x, float y, float z, float yaw, FloatBuffer vb, FloatBuffer texBuf, boolean isHead) {
         Matrix.setIdentityM(modelMatrix, 0);
         Matrix.translateM(modelMatrix, 0, x, y + 0.5f, z);
-        Matrix.rotateM(modelMatrix, 0, -yaw, 0, 1, 0);
+        Matrix.rotateM(modelMatrix, 0, -yaw + 180.0f, 0, 1, 0);
         if (isHead) Matrix.translateM(modelMatrix, 0, 0, 0.3f, 0.6f);
         Matrix.multiplyMM(tempMatrix, 0, viewMatrix, 0, modelMatrix, 0);
         Matrix.multiplyMM(mvpMatrix, 0, projectionMatrix, 0, tempMatrix, 0);
@@ -313,6 +313,7 @@ public class MyGLRenderer implements GLSurfaceView.Renderer {
         
         GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT | GLES20.GL_DEPTH_BUFFER_BIT);
         player.update(world);
+        network.sendPosition(player.x, player.y, player.z, player.yaw, player.pitch);
         for (Sheep s : world.sheepList) s.update(world);
         for (Dog d : world.dogList) d.update(world);
         
@@ -376,6 +377,11 @@ public class MyGLRenderer implements GLSurfaceView.Renderer {
         
         for (Sheep s : world.sheepList) drawMob(s);
         for (Dog d : world.dogList) drawMob(d);
+        if (network.otherPlayers != null) {
+            for (RemotePlayer rp : network.otherPlayers.values()) {
+                drawPlayer(rp.x, rp.y, rp.z, rp.yaw, rp.pitch, false);
+            }
+        }
         for (DroppedItem item : world.droppedItems) drawDroppedItem(item);
         
         if (player.thirdPerson) {
