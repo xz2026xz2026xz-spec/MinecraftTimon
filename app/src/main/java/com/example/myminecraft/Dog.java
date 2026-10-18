@@ -7,7 +7,7 @@ public class Dog {
     public float yaw;
     public float vy = 0;
     public float moveX = 0, moveZ = 0;
-    private float moveTimer = 0;
+    private float moveTimer = 40; // Пауза перед новым поворотом
     private Random rnd = new Random();
 
     public Dog(float x, float y, float z) {
@@ -48,7 +48,7 @@ public class Dog {
                 !Block.isSolid(world.getBlock((int)Math.floor(nx), (int)Math.floor(y + 1), (int)Math.floor(nz)))) {
                 x = nx; z = nz;
             } else {
-                moveTimer = 0;
+                moveTimer = 40; // Пауза перед новым поворотом
             }
         }
     }

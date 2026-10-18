@@ -46,9 +46,7 @@ public class TextureManager {
 
     public static void loadPlayerSkin(Context ctx) {
         try {
-            FileInputStream fis = ctx.openFileInput("skin.png");
-            Bitmap skin = BitmapFactory.decodeStream(fis);
-            fis.close();
+            Bitmap skin = BitmapFactory.decodeResource(ctx.getResources(), com.example.myminecraft.R.drawable.skin);
             if (skin != null) {
                 skinTextureId = loadTexture(skin);
                 skin.recycle();

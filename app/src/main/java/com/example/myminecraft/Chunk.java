@@ -101,12 +101,14 @@ public class Chunk {
         float v1 = 1.0f - ((row + 1) * tileStep) + epsilon;
         
         // ИСПРАВЛЕННЫЙ ПОРЯДОК UV-КООРДИНАТ
-        texCoords.add(u1); texCoords.add(v1); // BL
-        texCoords.add(u1); texCoords.add(v2); // TL
-        texCoords.add(u2); texCoords.add(v2); // TR
-        
-        texCoords.add(u1); texCoords.add(v1); // BL
-        texCoords.add(u2); texCoords.add(v2); // TR
+            // Правильный порядок UV
+            texCoords.add(u1); texCoords.add(v1); // BL
+            texCoords.add(u2); texCoords.add(v1); // BR
+            texCoords.add(u2); texCoords.add(v2); // TR
+
+            texCoords.add(u1); texCoords.add(v1); // BL
+            texCoords.add(u2); texCoords.add(v2); // TR
+            texCoords.add(u1); texCoords.add(v2); // TL
         texCoords.add(u2); texCoords.add(v1); // BR
     }
     

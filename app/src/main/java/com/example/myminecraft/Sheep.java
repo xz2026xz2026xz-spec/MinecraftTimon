@@ -7,7 +7,7 @@ public class Sheep {
     public float yaw;
     public float vy = 0;
     public float moveX = 0, moveZ = 0;
-    private float moveTimer = 0;
+    private float moveTimer = 40; // Пауза перед новым поворотом
     private Random rnd = new Random();
 
     public Sheep(float x, float y, float z) {
@@ -29,7 +29,7 @@ public class Sheep {
 
         moveTimer -= 1;
         if (moveTimer <= 0) {
-            moveTimer = 100 + rnd.nextInt(150);
+            moveTimer = 200 + rnd.nextInt(200);
             if (rnd.nextBoolean()) {
                 moveX = 0; moveZ = 0;
             } else {
@@ -48,7 +48,7 @@ public class Sheep {
                 !Block.isSolid(world.getBlock((int)Math.floor(nx), (int)Math.floor(y + 1), (int)Math.floor(nz)))) {
                 x = nx; z = nz;
             } else {
-                moveTimer = 0;
+                moveTimer = 40; // Пауза перед новым поворотом
             }
         }
     }
