@@ -696,6 +696,7 @@ public class MainActivity extends Activity {
         }
         
         private void drawInventory(Canvas c, int W, int H) {
+        android.graphics.Bitmap bgBitmap = android.graphics.BitmapFactory.decodeResource(getResources(), com.example.myminecraft.R.drawable.inventory_bg);
         Paint dim = new Paint(); dim.setColor(Color.argb(180, 0, 0, 0)); c.drawRect(0, 0, W, H, dim);
         
         if (bgBitmap != null) {
