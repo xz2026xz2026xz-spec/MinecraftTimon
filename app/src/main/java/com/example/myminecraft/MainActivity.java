@@ -30,6 +30,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 public class MainActivity extends Activity {
+    public android.graphics.Bitmap bgBitmap;
     private GLSurfaceView glView;
     private MyGLRenderer renderer;
     private OverlayView overlay;
@@ -221,7 +222,7 @@ public class MainActivity extends Activity {
                                 }
                             } else { 
                                 if (Inventory.movingSlot == idx) Inventory.movingSlot = -1; 
-                                else { Inventory.swapItems(Inventory.movingSlot, idx); Inventory.movingSlot = -1; }
+                                else { Inventory.swapSlots(Inventory.movingSlot, idx); Inventory.movingSlot = -1; }
                             }
                             return true;
                         }
@@ -239,7 +240,7 @@ public class MainActivity extends Activity {
                             }
                         } else { 
                             if (Inventory.movingSlot == i) Inventory.movingSlot = -1; 
-                            else { Inventory.swapItems(Inventory.movingSlot, i); Inventory.movingSlot = -1; }
+                            else { Inventory.swapSlots(Inventory.movingSlot, i); Inventory.movingSlot = -1; }
                         }
                         return true;
                     }
@@ -685,7 +686,7 @@ public class MainActivity extends Activity {
         }
         
         private void drawInventory(Canvas c, int W, int H) {
-        Paint dim = new Paint(); dim.setColor(Color.argb(180, 0, 0, 0)); c.drawRect(0, 0, W, H, dim);
+        Paint bgDim = new Paint(); bgDim.setColor(Color.argb(180, 0, 0, 0)); c.drawRect(0, 0, W, H, bgDim);
         if (bgBitmap != null) {
             float scale = Math.min((float) W / bgBitmap.getWidth(), (float) H / bgBitmap.getHeight()) * 0.8f;
             int bgW = (int)(bgBitmap.getWidth() * scale);
