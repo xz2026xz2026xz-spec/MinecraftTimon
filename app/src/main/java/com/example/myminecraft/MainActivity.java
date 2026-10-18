@@ -200,8 +200,8 @@ public class MainActivity extends Activity {
             if (craftingOpen) { handleCraftingUIDown(x, y, W, H); overlay.invalidate(); return true; }
             
             if (inventoryOpen) {
-                if (inCircle(x, y, W - 60, 60, 45 * scale)) { inventoryOpen = false; Inventory.movingSlot = -1; return true; }
-                if (x > 50 && x < 250 && y > 60 && y < 120) { craftingOpen = true; inventoryOpen = false; Inventory.movingSlot = -1; return true; }
+                if (inCircle(x, y, (int)(getWidth()/2 + (getWidth()*0.9f*bgBitmap.getWidth()/bgBitmap.getHeight())/2) - 40, (int)(getHeight() - getHeight()*0.9f)/2 + 40, 45 * scale)) { inventoryOpen = false; Inventory.movingSlot = -1; return true; }
+                if (x > 50 && x < 250 && y > 60 && y < 120) { craftingOpen = true; Inventory.movingSlot = -1; inventoryOpen = false; Inventory.movingSlot = -1; return true; }
                 
                 int slotSize = 100, hGap = 10;
                 int invStartX = (W - (9 * slotSize + 8 * hGap)) / 2, invStartY = 150;
@@ -402,7 +402,7 @@ public class MainActivity extends Activity {
     
     private void handleCraftingUIDown(float x, float y, int W, int H) {
         float scale = getUiScale();
-        if (inCircle(x, y, W - 60, 60, 45 * scale)) { craftingOpen = false; inventoryOpen = true; Inventory.movingSlot = -1; return; }
+        if (inCircle(x, y, W - 60, 60, 45 * scale)) { craftingOpen = false; inventoryOpen = true; Inventory.movingSlot = -1; Inventory.movingSlot = -1; return; }
         
         int slotSize = 100, gap = 10;
         int startX = W/2 - 200, startY = H/2 - 100;
@@ -501,7 +501,7 @@ public class MainActivity extends Activity {
             return true; 
         }
         if (inCircle(x, y, W - 230 * scale, 60, 45 * scale)) { renderer.player.thirdPerson = !renderer.player.thirdPerson; return true; }
-        if (inCircle(x, y, W - 140 * scale, 60, 45 * scale)) { inventoryOpen = true; Inventory.movingSlot = -1; return true; }
+        if (inCircle(x, y, W - 140 * scale, 60, 45 * scale)) { inventoryOpen = true; Inventory.movingSlot = -1; Inventory.movingSlot = -1; return true; }
         if (inCircle(x, y, W - 50 * scale, 60, 45 * scale)) { settingsOpen = true; settingsScrollY = 0; return true; }
         
         int slotSize = (int)(110 * scale), gap = (int)(10 * scale);
@@ -634,6 +634,16 @@ public class MainActivity extends Activity {
         }
         
         private void drawSlot(Canvas c, int sx, int sy, int slotSize, Inventory.Slot slot, boolean isSelected, boolean isMoving) {
+        // Рисуем серый фон слота
+        Paint bgPaint = new Paint(Paint.ANTI_ALIAS_FLAG); bgPaint.setStyle(Paint.Style.FILL);
+        bgPaint.setColor(Color.argb(150, 80, 80, 80)); // Темно-серый полупрозрачный
+        c.drawRect(sx, sy, sx + slotSize, sy + slotSize, bgPaint);
+        
+        // Рисуем белую рамку
+        Paint borderPaint = new Paint(Paint.ANTI_ALIAS_FLAG); borderPaint.setStyle(Paint.Style.STROKE);
+        borderPaint.setStrokeWidth(3f); borderPaint.setColor(Color.WHITE);
+        c.drawRect(sx, sy, sx + slotSize, sy + slotSize, borderPaint);
+
         if (isMoving) {
             Paint sel = new Paint(Paint.ANTI_ALIAS_FLAG); sel.setStyle(Paint.Style.STROKE); sel.setStrokeWidth(5f); sel.setColor(Color.YELLOW);
             c.drawRect(sx, sy, sx + slotSize, sy + slotSize, sel);

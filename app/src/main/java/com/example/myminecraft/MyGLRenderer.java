@@ -197,8 +197,8 @@ public class MyGLRenderer implements GLSurfaceView.Renderer {
         Matrix.multiplyMM(mvpMatrix, 0, projectionMatrix, 0, tempMatrix, 0);
         GLES20.glUniformMatrix4fv(mvpMatrixHandle, 1, false, mvpMatrix, 0);
         
-        int col = getTexIndex(item.type) % TextureManager.GRID_SIZE;
-        int row = getTexIndex(item.type) / TextureManager.GRID_SIZE;
+        int texIdx = getTexIndex(item.type); if (texIdx == -1) texIdx = 0; int col = texIdx % TextureManager.GRID_SIZE;
+        int row = texIdx / TextureManager.GRID_SIZE;
         float tileStep = 1.0f / TextureManager.GRID_SIZE;
         float epsilon = 0.001f;
         float u1 = col * tileStep + epsilon;
