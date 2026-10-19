@@ -643,36 +643,30 @@ public class MainActivity extends Activity {
     }
 
     private void drawSlot(Canvas c, int sx, int sy, int slotSize, Inventory.Slot slot, boolean isSelected, boolean isMoving) {
-        // Рисуем серый фон слота
-        Paint bgPaint = new Paint(Paint.ANTI_ALIAS_FLAG); bgPaint.setStyle(Paint.Style.FILL);
-        bgPaint.setColor(Color.argb(150, 80, 80, 80)); // Темно-серый полупрозрачный
-        c.drawRect(sx, sy, sx + slotSize, sy + slotSize, bgPaint);
-        
-        // Рисуем белую рамку
-        Paint borderPaint = new Paint(Paint.ANTI_ALIAS_FLAG); borderPaint.setStyle(Paint.Style.STROKE);
-        borderPaint.setStrokeWidth(3f); borderPaint.setColor(Color.WHITE);
-        c.drawRect(sx, sy, sx + slotSize, sy + slotSize, borderPaint);
-
+        Paint p = new Paint(Paint.ANTI_ALIAS_FLAG); p.setStyle(Paint.Style.FILL);
+        p.setColor(Color.argb(isSelected ? 220 : 100, 0, 0, 0));
+        c.drawRect(sx, sy, sx+slotSize, sy+slotSize, p);
+        c.drawRect(sx, sy, sx+slotSize, sy+slotSize, stroke);
         
         if (slot.type != Block.AIR) {
             int resId = 0;
             switch(slot.type) {
-                case Block.GRASS: resId = com.example.myminecraft.R.drawable.grass_top; break;
-                case Block.DIRT: resId = com.example.myminecraft.R.drawable.dirt; break;
-                case Block.STONE: resId = com.example.myminecraft.R.drawable.stone; break;
-                case Block.WOOD: resId = com.example.myminecraft.R.drawable.wood_side; break;
-                case Block.LEAVES: resId = com.example.myminecraft.R.drawable.leaves; break;
-                case Block.PLANKS: resId = com.example.myminecraft.R.drawable.planks; break;
-                case Block.COBBLESTONE: resId = com.example.myminecraft.R.drawable.cobblestone; break;
-                case Block.MEAT: resId = com.example.myminecraft.R.drawable.sheep_face; break;
+                case Block.GRASS: resId = R.drawable.grass_top; break;
+                case Block.DIRT: resId = R.drawable.dirt; break;
+                case Block.STONE: resId = R.drawable.stone; break;
+                case Block.WOOD: resId = R.drawable.wood_side; break;
+                case Block.LEAVES: resId = R.drawable.leaves; break;
+                case Block.PLANKS: resId = R.drawable.planks; break;
+                case Block.COBBLESTONE: resId = R.drawable.cobblestone; break;
+                case Block.MEAT: resId = R.drawable.sheep_face; break;
             }
             if (resId != 0) {
-                // Оптимизация: кешируем картинки, чтобы не загружать их каждый кадр
-                android.graphics.Bitmap bmp = getCachedBitmap(resId);
+                android.graphics.Bitmap bmp = android.graphics.BitmapFactory.decodeResource(getResources(), resId);
                 if (bmp != null) {
                     android.graphics.Rect src = new android.graphics.Rect(0, 0, bmp.getWidth(), bmp.getHeight());
                     android.graphics.Rect dst = new android.graphics.Rect(sx + 5, sy + 5, sx + slotSize - 5, sy + slotSize - 5);
                     c.drawBitmap(bmp, src, dst, null);
+                    bmp.recycle();
                 }
             }
             if (slot.count > 1) {
