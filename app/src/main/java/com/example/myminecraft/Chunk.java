@@ -10,7 +10,7 @@ public class Chunk {
     public final int startX, startY, startZ, sizeX, sizeY, sizeZ;
     private FloatBuffer vertexBuffer, colorBuffer, textureBuffer;
     private int vertexCount = 0;
-    public float centerX, centerY, centerZ, radius; // Для оптимизации
+    public float centerX, centerY, centerZ, radius;
 
     public Chunk(int startX, int startY, int startZ, int sizeX, int sizeY, int sizeZ) {
         this.startX = startX; this.startY = startY; this.startZ = startZ;
