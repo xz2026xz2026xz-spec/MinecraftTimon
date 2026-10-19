@@ -728,10 +728,10 @@ public class MainActivity extends Activity {
             c.drawCircle(left + bgW - 40, top + 40, 30, p);
             c.drawText("X", left + bgW - 40, top + 62, text);
             
-            android.graphics.Bitmap skin = android.graphics.BitmapFactory.decodeResource(getResources(), com.example.myminecraft.R.drawable.skin);
+            android.graphics.Bitmap skin = android.graphics.BitmapFactory.decodeResource(getResources(), R.drawable.skin);
             if (skin != null) {
                 android.graphics.Rect srcFace = new android.graphics.Rect(8, 8, 16, 16);
-                android.graphics.Rect dstFace = new android.graphics.Rect(left + (int)(bgW * 0.12f), top + (int)(bgH * 0.08f), left + (int)(bgW * 0.24f), top + (int)(bgH * 0.28f));
+                android.graphics.Rect dstFace = new android.graphics.Rect(left + (int)(bgW * 0.14f), top + (int)(bgH * 0.10f), left + (int)(bgW * 0.24f), top + (int)(bgH * 0.25f));
                 c.drawBitmap(skin, srcFace, dstFace, null);
                 skin.recycle();
             }
