@@ -14,12 +14,19 @@ public class PlayerModel {
         float[] tex = new float[7 * 36 * 2];
         int vIdx = 0, tIdx = 0;
 
+        // Голова (8x8x8)
         vIdx = addBox(verts, tex, vIdx, tIdx, 0, 0.2f, 0, 0.25f, 0.25f, 0.25f, 0, 0, 8, 8, 8); tIdx += 72;
-        vIdx = addBox(verts, tex, vIdx, tIdx, 0, 0.2f, 0, 0.255f, 0.255f, 0.255f, 32, 0, 8, 8, 8); tIdx += 72; // Шляпа
+        // Шляпа (чуть больше головы)
+        vIdx = addBox(verts, tex, vIdx, tIdx, 0, 0.2f, 0, 0.26f, 0.26f, 0.26f, 32, 0, 8, 8, 8); tIdx += 72; 
+        // Тело
         vIdx = addBox(verts, tex, vIdx, tIdx, 0, -0.15f, 0, 0.25f, 0.375f, 0.125f, 16, 16, 8, 12, 4); tIdx += 72;
+        // Правая рука
         vIdx = addBox(verts, tex, vIdx, tIdx, -0.375f, -0.15f, 0, 0.125f, 0.375f, 0.125f, 40, 16, 4, 12, 4); tIdx += 72;
+        // Левая рука
         vIdx = addBox(verts, tex, vIdx, tIdx, 0.375f, -0.15f, 0, 0.125f, 0.375f, 0.125f, 32, 48, 4, 12, 4); tIdx += 72;
+        // Правая нога
         vIdx = addBox(verts, tex, vIdx, tIdx, -0.125f, -0.6f, 0, 0.125f, 0.375f, 0.125f, 0, 16, 4, 12, 4); tIdx += 72;
+        // Левая нога
         vIdx = addBox(verts, tex, vIdx, tIdx, 0.125f, -0.6f, 0, 0.125f, 0.375f, 0.125f, 16, 48, 4, 12, 4); tIdx += 72;
 
         vertexCount = 7 * 36;

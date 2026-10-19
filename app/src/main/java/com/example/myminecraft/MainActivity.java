@@ -619,7 +619,7 @@ public class MainActivity extends Activity {
                 drawSlot(c, sx, hotbarStartY, slotSize, Inventory.slots[i], i == Inventory.selectedSlot, i == Inventory.movingSlot);
             }
             
-            if (inventoryOpen) drawInventory(c, W, H);
+            if (inventoryOpen) { Inventory.movingSlot = -1; drawInventory(c, W, H); }
             if (craftingOpen) drawCrafting(c, W, H);
             if (settingsOpen) drawSettings(c, W, H);
         }
