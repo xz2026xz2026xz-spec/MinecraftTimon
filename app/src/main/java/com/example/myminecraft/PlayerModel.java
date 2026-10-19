@@ -14,20 +14,14 @@ public class PlayerModel {
         float[] tex = new float[7 * 36 * 2];
         int vIdx = 0, tIdx = 0;
 
-        // Голова (8x8x8)
-        vIdx = addBox(verts, tex, vIdx, tIdx, 0, 0.2f, 0, 0.25f, 0.25f, 0.25f, 0, 0, 8, 8, 8); tIdx += 72;
-        // Шляпа (чуть больше головы)
-        vIdx = addBox(verts, tex, vIdx, tIdx, 0, 0.2f, 0, 0.26f, 0.26f, 0.26f, 32, 0, 8, 8, 8); tIdx += 72; 
-        // Тело
-        vIdx = addBox(verts, tex, vIdx, tIdx, 0, -0.15f, 0, 0.25f, 0.375f, 0.125f, 16, 16, 8, 12, 4); tIdx += 72;
-        // Правая рука
-        vIdx = addBox(verts, tex, vIdx, tIdx, -0.375f, -0.15f, 0, 0.125f, 0.375f, 0.125f, 40, 16, 4, 12, 4); tIdx += 72;
-        // Левая рука
-        vIdx = addBox(verts, tex, vIdx, tIdx, 0.375f, -0.15f, 0, 0.125f, 0.375f, 0.125f, 32, 48, 4, 12, 4); tIdx += 72;
-        // Правая нога
-        vIdx = addBox(verts, tex, vIdx, tIdx, -0.125f, -0.6f, 0, 0.125f, 0.375f, 0.125f, 0, 16, 4, 12, 4); tIdx += 72;
-        // Левая нога
-        vIdx = addBox(verts, tex, vIdx, tIdx, 0.125f, -0.6f, 0, 0.125f, 0.375f, 0.125f, 16, 48, 4, 12, 4); tIdx += 72;
+        // Голова, Шляпа, Тело, Руки, Ноги (с правильными UV)
+        vIdx = addBox(verts, tex, vIdx, tIdx, 0, 0.2f, 0, 0.25f, 0.25f, 0.25f, 0, 0); tIdx += 72;
+        vIdx = addBox(verts, tex, vIdx, tIdx, 0, 0.2f, 0, 0.26f, 0.26f, 0.26f, 32, 0); tIdx += 72;
+        vIdx = addBox(verts, tex, vIdx, tIdx, 0, -0.15f, 0, 0.25f, 0.375f, 0.125f, 16, 16); tIdx += 72;
+        vIdx = addBox(verts, tex, vIdx, tIdx, -0.375f, -0.15f, 0, 0.125f, 0.375f, 0.125f, 40, 16); tIdx += 72;
+        vIdx = addBox(verts, tex, vIdx, tIdx, 0.375f, -0.15f, 0, 0.125f, 0.375f, 0.125f, 32, 48); tIdx += 72;
+        vIdx = addBox(verts, tex, vIdx, tIdx, -0.125f, -0.6f, 0, 0.125f, 0.375f, 0.125f, 0, 16); tIdx += 72;
+        vIdx = addBox(verts, tex, vIdx, tIdx, 0.125f, -0.6f, 0, 0.125f, 0.375f, 0.125f, 16, 48); tIdx += 72;
 
         vertexCount = 7 * 36;
         ByteBuffer bb = ByteBuffer.allocateDirect(verts.length * 4); bb.order(ByteOrder.nativeOrder());
@@ -36,12 +30,12 @@ public class PlayerModel {
         texBuffer = tb.asFloatBuffer(); texBuffer.put(tex); texBuffer.position(0);
     }
 
-    private int addBox(float[] v, float[] t, int vIdx, int tIdx, float cx, float cy, float cz, float hx, float hy, float hz, int u, int vp, int w, int h, int d) {
+    private int addBox(float[] v, float[] t, int vIdx, int tIdx, float cx, float cy, float cz, float hx, float hy, float hz, int u, int vp) {
         float texSize = 64f;
         float[][] faceUVs = {
-            {u + d, vp + d, u + d + w, vp + d + h}, {u + d + w + d, vp + d, u + d + w + d + w, vp + d + h},
-            {u + d, vp, u + d + w, vp + d}, {u + d + w, vp + d, u + d + w + d, vp + d + h},
-            {u, vp + d, u + d, vp + d + h}, {u + d + w, vp + d, u + d + w + d, vp + d + h}
+            {u + 8, vp + 8, u + 16, vp + 16}, {u + 24, vp + 8, u + 32, vp + 16}, // Front, Back
+            {u + 8, vp, u + 16, vp + 8}, {u + 16, vp, u + 24, vp + 8}, // Top, Bottom
+            {u, vp + 8, u + 8, vp + 16}, {u + 16, vp + 8, u + 24, vp + 16} // Right, Left
         };
         for (int f = 0; f < 6; f++) {
             float u1 = faceUVs[f][0] / texSize, v1 = faceUVs[f][1] / texSize;

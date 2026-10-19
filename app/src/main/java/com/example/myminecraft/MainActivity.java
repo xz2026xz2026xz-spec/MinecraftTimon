@@ -653,10 +653,6 @@ public class MainActivity extends Activity {
         borderPaint.setStrokeWidth(3f); borderPaint.setColor(Color.WHITE);
         c.drawRect(sx, sy, sx + slotSize, sy + slotSize, borderPaint);
 
-        if (isMoving) {
-            Paint sel = new Paint(Paint.ANTI_ALIAS_FLAG); sel.setStyle(Paint.Style.STROKE); sel.setStrokeWidth(5f); sel.setColor(Color.YELLOW);
-            c.drawRect(sx, sy, sx + slotSize, sy + slotSize, sel);
-        }
         
         if (slot.type != Block.AIR) {
             int resId = 0;
