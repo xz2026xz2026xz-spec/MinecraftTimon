@@ -525,6 +525,8 @@ public class MainActivity extends Activity {
     }
     
     private class OverlayView extends View {
+        public float btnX = -100, btnY = -100;
+
         private final Paint stroke = new Paint(Paint.ANTI_ALIAS_FLAG), fill = new Paint(Paint.ANTI_ALIAS_FLAG), text = new Paint(Paint.ANTI_ALIAS_FLAG), bg = new Paint(Paint.ANTI_ALIAS_FLAG);
         
         public OverlayView(Context ctx) {
