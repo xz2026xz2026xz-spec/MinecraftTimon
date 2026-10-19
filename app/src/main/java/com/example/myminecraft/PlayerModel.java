@@ -14,14 +14,13 @@ public class PlayerModel {
         float[] tex = new float[7 * 36 * 2];
         int vIdx = 0, tIdx = 0;
 
-        // Правильные пропорции Стива (64x64 UV)
-        vIdx = addBox(verts, tex, vIdx, tIdx, 0, 0.2f, 0, 0.25f, 0.25f, 0.25f, 0, 0); tIdx += 72; // Голова
-        vIdx = addBox(verts, tex, vIdx, tIdx, 0, 0.2f, 0, 0.26f, 0.26f, 0.26f, 32, 0); tIdx += 72; // Шляпа
-        vIdx = addBox(verts, tex, vIdx, tIdx, 0, -0.15f, 0, 0.25f, 0.375f, 0.125f, 16, 16); tIdx += 72; // Тело
-        vIdx = addBox(verts, tex, vIdx, tIdx, -0.375f, -0.15f, 0, 0.125f, 0.375f, 0.125f, 40, 16); tIdx += 72; // Правая рука
-        vIdx = addBox(verts, tex, vIdx, tIdx, 0.375f, -0.15f, 0, 0.125f, 0.375f, 0.125f, 32, 48); tIdx += 72; // Левая рука
-        vIdx = addBox(verts, tex, vIdx, tIdx, -0.125f, -0.6f, 0, 0.125f, 0.375f, 0.125f, 0, 16); tIdx += 72; // Правая нога
-        vIdx = addBox(verts, tex, vIdx, tIdx, 0.125f, -0.6f, 0, 0.125f, 0.375f, 0.125f, 16, 48); tIdx += 72; // Левая нога
+        vIdx = addBox(verts, tex, vIdx, tIdx, 0, 0.2f, 0, 0.25f, 0.25f, 0.25f, 0, 0); tIdx += 72;
+        vIdx = addBox(verts, tex, vIdx, tIdx, 0, 0.2f, 0, 0.26f, 0.26f, 0.26f, 32, 0); tIdx += 72;
+        vIdx = addBox(verts, tex, vIdx, tIdx, 0, -0.15f, 0, 0.25f, 0.375f, 0.125f, 16, 16); tIdx += 72;
+        vIdx = addBox(verts, tex, vIdx, tIdx, -0.375f, -0.15f, 0, 0.125f, 0.375f, 0.125f, 40, 16); tIdx += 72;
+        vIdx = addBox(verts, tex, vIdx, tIdx, 0.375f, -0.15f, 0, 0.125f, 0.375f, 0.125f, 32, 48); tIdx += 72;
+        vIdx = addBox(verts, tex, vIdx, tIdx, -0.125f, -0.6f, 0, 0.125f, 0.375f, 0.125f, 0, 16); tIdx += 72;
+        vIdx = addBox(verts, tex, vIdx, tIdx, 0.125f, -0.6f, 0, 0.125f, 0.375f, 0.125f, 16, 48); tIdx += 72;
 
         vertexCount = 7 * 36;
         ByteBuffer bb = ByteBuffer.allocateDirect(verts.length * 4); bb.order(ByteOrder.nativeOrder());
@@ -33,21 +32,15 @@ public class PlayerModel {
     private int addBox(float[] v, float[] t, int vIdx, int tIdx, float cx, float cy, float cz, float hx, float hy, float hz, int u, int vp) {
         float texSize = 64f;
         float[][] faceUVs = {
-            {u + 8, vp + 8, u + 16, vp + 16}, {u + 24, vp + 8, u + 32, vp + 16}, // Лицо, Спина
-            {u + 8, vp, u + 16, vp + 8}, {u + 16, vp, u + 24, vp + 8}, // Верх, Низ
-            {u, vp + 8, u + 8, vp + 16}, {u + 16, vp + 8, u + 24, vp + 16} // Бока
+            {u + 8, vp + 8, u + 16, vp + 16}, {u + 24, vp + 8, u + 32, vp + 16},
+            {u + 8, vp, u + 16, vp + 8}, {u + 16, vp, u + 24, vp + 8},
+            {u, vp + 8, u + 8, vp + 16}, {u + 16, vp + 8, u + 24, vp + 16}
         };
         for (int f = 0; f < 6; f++) {
             float u1 = faceUVs[f][0] / texSize, v1 = faceUVs[f][1] / texSize;
             float u2 = faceUVs[f][2] / texSize, v2 = faceUVs[f][3] / texSize;
-            for (int i = 0; i < 6; i++) {
-                int offset = i * 12;
-                if (i == 0 || i == 3) { t[tIdx + offset] = u1; t[tIdx + offset + 1] = v2; }
-                else if (i == 1 || i == 4) { t[tIdx + offset] = u2; t[tIdx + offset + 1] = v2; }
-                else { t[tIdx + offset] = u2; t[tIdx + offset + 1] = v1; }
-                t[tIdx + offset + 2] = u1; t[tIdx + offset + 3] = v1;
-                t[tIdx + offset + 4] = u2; t[tIdx + offset + 5] = v1;
-            }
+            t[tIdx + f*12] = u1; t[tIdx + f*12 + 1] = v2; t[tIdx + f*12 + 2] = u2; t[tIdx + f*12 + 3] = v2; t[tIdx + f*12 + 4] = u2; t[tIdx + f*12 + 5] = v1;
+            t[tIdx + f*12 + 6] = u1; t[tIdx + f*12 + 7] = v2; t[tIdx + f*12 + 8] = u2; t[tIdx + f*12 + 9] = v1; t[tIdx + f*12 + 10] = u1; t[tIdx + f*12 + 11] = v1;
         }
         float[] f = {
             -hx,-hy, hz,  hx,-hy, hz,  hx, hy, hz, -hx,-hy, hz,  hx, hy, hz, -hx, hy, hz,
@@ -58,9 +51,7 @@ public class PlayerModel {
             -hx,-hy,-hz, -hx,-hy, hz, -hx, hy, hz, -hx,-hy,-hz, -hx, hy, hz, -hx, hy,-hz
         };
         for(int i=0; i<36; i++) {
-            v[vIdx + i*3] = cx + f[i*3];
-            v[vIdx + i*3 + 1] = cy + f[i*3+1];
-            v[vIdx + i*3 + 2] = cz + f[i*3+2];
+            v[vIdx + i*3] = cx + f[i*3]; v[vIdx + i*3 + 1] = cy + f[i*3+1]; v[vIdx + i*3 + 2] = cz + f[i*3+2];
         }
         return vIdx + 108;
     }

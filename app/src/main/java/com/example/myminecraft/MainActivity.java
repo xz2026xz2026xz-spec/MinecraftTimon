@@ -661,12 +661,11 @@ public class MainActivity extends Activity {
                 case Block.MEAT: resId = R.drawable.sheep_face; break;
             }
             if (resId != 0) {
-                android.graphics.Bitmap bmp = android.graphics.BitmapFactory.decodeResource(getResources(), resId);
+                android.graphics.Bitmap bmp = getCachedBitmap(resId);
                 if (bmp != null) {
                     android.graphics.Rect src = new android.graphics.Rect(0, 0, bmp.getWidth(), bmp.getHeight());
                     android.graphics.Rect dst = new android.graphics.Rect(sx + 5, sy + 5, sx + slotSize - 5, sy + slotSize - 5);
                     c.drawBitmap(bmp, src, dst, null);
-                    bmp.recycle();
                 }
             }
             if (slot.count > 1) {
@@ -719,7 +718,7 @@ public class MainActivity extends Activity {
             
             text.setTextSize(60f); text.setTextAlign(Paint.Align.CENTER);
             Paint p = new Paint(); p.setColor(Color.WHITE); p.setStyle(Paint.Style.STROKE); p.setStrokeWidth(6f);
-            c.drawCircle(left + bgW - 40, top + 40, 30, p);
+            btnX = left + bgW - 40; btnY = top + 40; c.drawCircle(btnX, btnY, 30, p);
             c.drawText("X", left + bgW - 40, top + 62, text);
             
             android.graphics.Bitmap skin = android.graphics.BitmapFactory.decodeResource(getResources(), R.drawable.skin);

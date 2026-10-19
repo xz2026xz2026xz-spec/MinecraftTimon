@@ -42,17 +42,17 @@ public class Chunk {
                     if (block == Block.AIR) continue;
 
                     if (!Block.isSolid(world.getBlock(wx, wy + 1, wz))) 
-                        addFace(verts, cols, texCoords, Block.getColor(block, 0), getTexIndex(block, 0), wx, wy+1, wz, wx, wy+1, wz+1, wx+1, wy+1, wz+1, wx+1, wy+1, wz);
+                        addFace(verts, cols, texCoords, Block.getColor(block, 0), getTexIndex(block, 0), wx, wy+1, wz+1, wx, wy+1, wz, wx+1, wy+1, wz, wx+1, wy+1, wz+1);
                     if (!Block.isSolid(world.getBlock(wx, wy - 1, wz))) 
-                        addFace(verts, cols, texCoords, Block.getColor(block, 1), getTexIndex(block, 1), wx, wy, wz+1, wx, wy, wz, wx+1, wy, wz, wx+1, wy, wz+1);
+                        addFace(verts, cols, texCoords, Block.getColor(block, 1), getTexIndex(block, 1), wx, wy, wz, wx, wy, wz+1, wx+1, wy, wz+1, wx+1, wy, wz);
                     if (!Block.isSolid(world.getBlock(wx, wy, wz - 1))) 
-                        addFace(verts, cols, texCoords, Block.getColor(block, 2), getTexIndex(block, 2), wx, wy, wz, wx+1, wy, wz, wx+1, wy+1, wz, wx, wy+1, wz);
+                        addFace(verts, cols, texCoords, Block.getColor(block, 2), getTexIndex(block, 2), wx, wy+1, wz, wx, wy, wz, wx+1, wy, wz, wx+1, wy+1, wz);
                     if (!Block.isSolid(world.getBlock(wx, wy, wz + 1))) 
-                        addFace(verts, cols, texCoords, Block.getColor(block, 2), getTexIndex(block, 2), wx+1, wy, wz+1, wx, wy, wz+1, wx, wy+1, wz+1, wx+1, wy+1, wz+1);
+                        addFace(verts, cols, texCoords, Block.getColor(block, 2), getTexIndex(block, 2), wx+1, wy+1, wz+1, wx+1, wy, wz+1, wx, wy, wz+1, wx, wy+1, wz+1);
                     if (!Block.isSolid(world.getBlock(wx - 1, wy, wz))) 
-                        addFace(verts, cols, texCoords, Block.getColor(block, 2), getTexIndex(block, 2), wx, wy, wz+1, wx, wy, wz, wx, wy+1, wz, wx, wy+1, wz+1);
+                        addFace(verts, cols, texCoords, Block.getColor(block, 2), getTexIndex(block, 2), wx, wy+1, wz+1, wx, wy, wz+1, wx, wy, wz, wx, wy+1, wz);
                     if (!Block.isSolid(world.getBlock(wx + 1, wy, wz))) 
-                        addFace(verts, cols, texCoords, Block.getColor(block, 2), getTexIndex(block, 2), wx+1, wy, wz, wx+1, wy, wz+1, wx+1, wy+1, wz+1, wx+1, wy+1, wz);
+                        addFace(verts, cols, texCoords, Block.getColor(block, 2), getTexIndex(block, 2), wx+1, wy+1, wz, wx+1, wy, wz, wx+1, wy, wz+1, wx+1, wy+1, wz+1);
                 }
             }
         }
@@ -67,10 +67,10 @@ public class Chunk {
         if (texIndex == -1) { for (int i = 0; i < 12; i++) t.add(-1f); return; }
         float step = 1.0f / TextureManager.GRID_SIZE;
         int cx = texIndex % TextureManager.GRID_SIZE, cy = texIndex / TextureManager.GRID_SIZE;
-        float u1 = cx * step + 0.001f, u2 = (cx + 1) * step - 0.001f;
-        float v2 = 1.0f - (cy * step) - 0.001f, v1 = 1.0f - ((cy + 1) * step) + 0.001f;
-        t.add(u1); t.add(v1); t.add(u2); t.add(v1); t.add(u2); t.add(v2);
-        t.add(u1); t.add(v1); t.add(u2); t.add(v2); t.add(u1); t.add(v2);
+        float u1 = cx * step, u2 = (cx + 1) * step;
+        float v2 = 1.0f - (cy * step), v1 = 1.0f - ((cy + 1) * step);
+        t.add(u1); t.add(v1); t.add(u1); t.add(v2); t.add(u2); t.add(v2);
+        t.add(u1); t.add(v1); t.add(u2); t.add(v2); t.add(u2); t.add(v1);
     }
 
     private FloatBuffer createBuffer(List<Float> list) {
