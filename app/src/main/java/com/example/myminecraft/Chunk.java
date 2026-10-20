@@ -41,22 +41,16 @@ public class Chunk {
                     byte block = world.getBlock(wx, wy, wz);
                     if (block == Block.AIR) continue;
 
-                    // Верх (Top)
                     if (!Block.isSolid(world.getBlock(wx, wy + 1, wz))) 
                         addFace(verts, cols, texCoords, Block.getColor(block, 0), getTexIndex(block, 0), wx, wy+1, wz+1, wx, wy+1, wz, wx+1, wy+1, wz, wx+1, wy+1, wz+1);
-                    // Низ (Bottom)
                     if (!Block.isSolid(world.getBlock(wx, wy - 1, wz))) 
                         addFace(verts, cols, texCoords, Block.getColor(block, 1), getTexIndex(block, 1), wx, wy, wz, wx, wy, wz+1, wx+1, wy, wz+1, wx+1, wy, wz);
-                    // Перед (Front)
                     if (!Block.isSolid(world.getBlock(wx, wy, wz - 1))) 
                         addFace(verts, cols, texCoords, Block.getColor(block, 2), getTexIndex(block, 2), wx, wy+1, wz, wx, wy, wz, wx+1, wy, wz, wx+1, wy+1, wz);
-                    // Зад (Back)
                     if (!Block.isSolid(world.getBlock(wx, wy, wz + 1))) 
                         addFace(verts, cols, texCoords, Block.getColor(block, 2), getTexIndex(block, 2), wx+1, wy+1, wz+1, wx+1, wy, wz+1, wx, wy, wz+1, wx, wy+1, wz+1);
-                    // Лево (Left)
                     if (!Block.isSolid(world.getBlock(wx - 1, wy, wz))) 
                         addFace(verts, cols, texCoords, Block.getColor(block, 2), getTexIndex(block, 2), wx, wy+1, wz+1, wx, wy, wz+1, wx, wy, wz, wx, wy+1, wz);
-                    // Право (Right)
                     if (!Block.isSolid(world.getBlock(wx + 1, wy, wz))) 
                         addFace(verts, cols, texCoords, Block.getColor(block, 2), getTexIndex(block, 2), wx+1, wy+1, wz, wx+1, wy, wz, wx+1, wy, wz+1, wx+1, wy+1, wz+1);
                 }
@@ -74,10 +68,11 @@ public class Chunk {
         
         float step = 1.0f / TextureManager.GRID_SIZE;
         int cx = texIndex % TextureManager.GRID_SIZE, cy = texIndex / TextureManager.GRID_SIZE;
-        float u1 = cx * step, u2 = (cx + 1) * step;
-        float v2 = 1.0f - (cy * step), v1 = 1.0f - ((cy + 1) * step);
+        // ДОБАВЛЯЕМ EPSILON, ЧТОБЫ ТЕКСТУРЫ НЕ СМЕШИВАЛИСЬ
+        float e = 0.001f;
+        float u1 = cx * step + e, u2 = (cx + 1) * step - e;
+        float v2 = 1.0f - (cy * step) - e, v1 = 1.0f - ((cy + 1) * step) + e;
         
-        // Порядок важен: Левый-нижний, Левый-верхний, Правый-верхний, Правый-нижний
         t.add(u1); t.add(v1); // 1
         t.add(u1); t.add(v2); // 2
         t.add(u2); t.add(v2); // 3
