@@ -145,7 +145,7 @@ public class MyGLRenderer implements GLSurfaceView.Renderer {
     
     @Override public void onSurfaceCreated(GL10 unused, EGLConfig config) {
         GLES20.glClearColor(0.5f, 0.7f, 1.0f, 1.0f);
-        GLES20.glEnable(GLES20.GL_DEPTH_TEST); GLES20.glEnable(GLES20.GL_CULL_FACE); GLES20.glCullFace(GLES20.GL_BACK);
+        GLES20.glEnable(GLES20.GL_DEPTH_TEST); GLES20.glDisable(GLES20.GL_CULL_FACE); GLES20.glCullFace(GLES20.GL_BACK);
         
         TextureManager.loadTextures(ctx); 
         TextureManager.loadPlayerSkin(ctx);
