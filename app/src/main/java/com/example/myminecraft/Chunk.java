@@ -41,18 +41,24 @@ public class Chunk {
                     byte block = world.getBlock(wx, wy, wz);
                     if (block == Block.AIR) continue;
 
+                    // Верх (Top) - CCW порядок (Против часовой стрелки)
                     if (!Block.isSolid(world.getBlock(wx, wy + 1, wz))) 
-                        addFace(verts, cols, texCoords, Block.getColor(block, 0), getTexIndex(block, 0), wx, wy+1, wz+1, wx, wy+1, wz, wx+1, wy+1, wz, wx+1, wy+1, wz+1);
+                        addFace(verts, cols, texCoords, Block.getColor(block, 0), getTexIndex(block, 0), wx, wy+1, wz, wx, wy+1, wz+1, wx+1, wy+1, wz+1, wx+1, wy+1, wz);
+                    // Низ (Bottom)
                     if (!Block.isSolid(world.getBlock(wx, wy - 1, wz))) 
-                        addFace(verts, cols, texCoords, Block.getColor(block, 1), getTexIndex(block, 1), wx, wy, wz, wx, wy, wz+1, wx+1, wy, wz+1, wx+1, wy, wz);
+                        addFace(verts, cols, texCoords, Block.getColor(block, 1), getTexIndex(block, 1), wx, wy, wz+1, wx, wy, wz, wx+1, wy, wz, wx+1, wy, wz+1);
+                    // Перед (Front)
                     if (!Block.isSolid(world.getBlock(wx, wy, wz - 1))) 
-                        addFace(verts, cols, texCoords, Block.getColor(block, 2), getTexIndex(block, 2), wx, wy+1, wz, wx, wy, wz, wx+1, wy, wz, wx+1, wy+1, wz);
+                        addFace(verts, cols, texCoords, Block.getColor(block, 2), getTexIndex(block, 2), wx, wy, wz, wx+1, wy, wz, wx+1, wy+1, wz, wx, wy+1, wz);
+                    // Зад (Back)
                     if (!Block.isSolid(world.getBlock(wx, wy, wz + 1))) 
-                        addFace(verts, cols, texCoords, Block.getColor(block, 2), getTexIndex(block, 2), wx+1, wy+1, wz+1, wx+1, wy, wz+1, wx, wy, wz+1, wx, wy+1, wz+1);
+                        addFace(verts, cols, texCoords, Block.getColor(block, 2), getTexIndex(block, 2), wx+1, wy, wz+1, wx, wy, wz+1, wx, wy+1, wz+1, wx+1, wy+1, wz+1);
+                    // Лево (Left)
                     if (!Block.isSolid(world.getBlock(wx - 1, wy, wz))) 
-                        addFace(verts, cols, texCoords, Block.getColor(block, 2), getTexIndex(block, 2), wx, wy+1, wz+1, wx, wy, wz+1, wx, wy, wz, wx, wy+1, wz);
+                        addFace(verts, cols, texCoords, Block.getColor(block, 2), getTexIndex(block, 2), wx, wy, wz+1, wx, wy, wz, wx, wy+1, wz, wx, wy+1, wz+1);
+                    // Право (Right)
                     if (!Block.isSolid(world.getBlock(wx + 1, wy, wz))) 
-                        addFace(verts, cols, texCoords, Block.getColor(block, 2), getTexIndex(block, 2), wx+1, wy+1, wz, wx+1, wy, wz, wx+1, wy, wz+1, wx+1, wy+1, wz+1);
+                        addFace(verts, cols, texCoords, Block.getColor(block, 2), getTexIndex(block, 2), wx+1, wy, wz, wx+1, wy, wz+1, wx+1, wy+1, wz+1, wx+1, wy+1, wz);
                 }
             }
         }
@@ -70,17 +76,17 @@ public class Chunk {
         int cx = texIndex % TextureManager.GRID_SIZE, cy = texIndex / TextureManager.GRID_SIZE;
         float e = 0.001f;
         
-        // ПРАВИЛЬНЫЕ КООРДИНАТЫ (без переворота)
+        // Правильный переворот для Android -> OpenGL
         float u1 = cx * step + e, u2 = (cx + 1) * step - e;
-        float v1 = cy * step + e, v2 = (cy + 1) * step - e;
+        float v2 = 1.0f - (cy * step) - e, v1 = 1.0f - ((cy + 1) * step) + e;
         
-        t.add(u1); t.add(v1); // 1
-        t.add(u1); t.add(v2); // 2
-        t.add(u2); t.add(v2); // 3
+        t.add(u1); t.add(v1); // Низ-Лево
+        t.add(u1); t.add(v2); // Верх-Лево
+        t.add(u2); t.add(v2); // Верх-Право
         
-        t.add(u1); t.add(v1); // 1
-        t.add(u2); t.add(v2); // 3
-        t.add(u2); t.add(v1); // 4
+        t.add(u1); t.add(v1); // Низ-Лево
+        t.add(u2); t.add(v2); // Верх-Право
+        t.add(u2); t.add(v1); // Низ-Право
     }
 
     private FloatBuffer createBuffer(List<Float> list) {
