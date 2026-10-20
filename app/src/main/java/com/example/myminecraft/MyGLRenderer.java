@@ -67,10 +67,10 @@ public class MyGLRenderer implements GLSurfaceView.Renderer {
     }
     
     private void buildMobsMesh() {
-        sheepBodyTex = createTexBuffer(2, 3);
-        sheepHeadTex = createTexBuffer(1, 3);
-        dogBodyTex = createTexBuffer(0, 4);
-        dogHeadTex = createTexBuffer(3, 3);
+        sheepBodyTex = createTexBuffer(2, 1);
+        sheepHeadTex = createTexBuffer(1, 1);
+        dogBodyTex = createTexBuffer(0, 0);
+        dogHeadTex = createTexBuffer(3, 1);
         
         ByteBuffer itemTb = ByteBuffer.allocateDirect(72 * 4); itemTb.order(ByteOrder.nativeOrder());
         itemTexBuffer = itemTb.asFloatBuffer();
