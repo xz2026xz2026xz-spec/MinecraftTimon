@@ -68,10 +68,11 @@ public class Chunk {
         
         float step = 1.0f / TextureManager.GRID_SIZE;
         int cx = texIndex % TextureManager.GRID_SIZE, cy = texIndex / TextureManager.GRID_SIZE;
-        // ДОБАВЛЯЕМ EPSILON, ЧТОБЫ ТЕКСТУРЫ НЕ СМЕШИВАЛИСЬ
         float e = 0.001f;
+        
+        // ПРАВИЛЬНЫЕ КООРДИНАТЫ (без переворота)
         float u1 = cx * step + e, u2 = (cx + 1) * step - e;
-        float v2 = 1.0f - (cy * step) - e, v1 = 1.0f - ((cy + 1) * step) + e;
+        float v1 = cy * step + e, v2 = (cy + 1) * step - e;
         
         t.add(u1); t.add(v1); // 1
         t.add(u1); t.add(v2); // 2
