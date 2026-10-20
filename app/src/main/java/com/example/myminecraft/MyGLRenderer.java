@@ -52,8 +52,8 @@ public class MyGLRenderer implements GLSurfaceView.Renderer {
         float epsilon = 0.001f;
         float u1 = col * tileStep + epsilon;
         float u2 = (col + 1) * tileStep - epsilon;
-        float v2 = 1.0f - (row * tileStep) - epsilon;
-        float v1 = 1.0f - ((row + 1) * tileStep) + epsilon;
+        float v1 = row * tileStep + epsilon;
+        float v2 = (row + 1) * tileStep - epsilon;
         
         float[] tCoords = new float[72];
         for(int i=0; i<6; i++) {
@@ -67,10 +67,10 @@ public class MyGLRenderer implements GLSurfaceView.Renderer {
     }
     
     private void buildMobsMesh() {
-        sheepBodyTex = createTexBuffer(2, 1);
-        sheepHeadTex = createTexBuffer(1, 1);
-        dogBodyTex = createTexBuffer(0, 0);
-        dogHeadTex = createTexBuffer(3, 1);
+        sheepBodyTex = createTexBuffer(2, 2);
+        sheepHeadTex = createTexBuffer(1, 2);
+        dogBodyTex = createTexBuffer(0, 3);
+        dogHeadTex = createTexBuffer(3, 2);
         
         ByteBuffer itemTb = ByteBuffer.allocateDirect(72 * 4); itemTb.order(ByteOrder.nativeOrder());
         itemTexBuffer = itemTb.asFloatBuffer();
