@@ -203,8 +203,8 @@ public class MainActivity extends Activity {
                     int slotSize = (int)(bgW * 0.08f);
                     int hGap = (int)(bgW * 0.004f);
                     
-                    int invStartX = left + (int)(bgW * 0.22f);
-                    int invStartY = top + (int)(bgH * 0.45f);
+                    int invStartX = left + (int)(bgW * 0.25f);
+                    int invStartY = top + (int)(bgH * 0.42f);
                     int hotbarY = top + (int)(bgH * 0.82f);
                     int craftX = left + (int)(bgW * 0.58f);
                     int craftY = top + (int)(bgH * 0.10f);
@@ -308,8 +308,8 @@ public class MainActivity extends Activity {
                     int left = (W - bgW) / 2, top = (H - bgH) / 2;
                     int slotSize = (int)(bgW * 0.08f);
                     int hGap = (int)(bgW * 0.004f);
-                    int invStartX = left + (int)(bgW * 0.22f);
-                    int invStartY = top + (int)(bgH * 0.45f);
+                    int invStartX = left + (int)(bgW * 0.25f);
+                    int invStartY = top + (int)(bgH * 0.42f);
                     int hotbarY = top + (int)(bgH * 0.82f);
                     
                     int currentSlot = -1;
@@ -691,8 +691,6 @@ public class MainActivity extends Activity {
     }
 
 private void drawSlot(Canvas c, int sx, int sy, int slotSize, Inventory.Slot slot, boolean isSelected, boolean isMoving) {
-        // УБРАЛИ ОТРИСОВКУ ФОНА И РАМОК, т.к. они уже есть на картинке!
-        
         if (slot.type != Block.AIR) {
             int resId = 0;
             switch(slot.type) {
@@ -708,7 +706,6 @@ private void drawSlot(Canvas c, int sx, int sy, int slotSize, Inventory.Slot slo
             if (resId != 0) {
                 android.graphics.Bitmap bmp = android.graphics.BitmapFactory.decodeResource(getResources(), resId);
                 if (bmp != null) {
-                    // Немного уменьшаем предмет, чтобы он красиво вписывался в слот на фото
                     android.graphics.Rect src = new android.graphics.Rect(0, 0, bmp.getWidth(), bmp.getHeight());
                     android.graphics.Rect dst = new android.graphics.Rect(sx + 5, sy + 5, sx + slotSize - 5, sy + slotSize - 5);
                     c.drawBitmap(bmp, src, dst, null);
@@ -779,8 +776,8 @@ private void drawSlot(Canvas c, int sx, int sy, int slotSize, Inventory.Slot slo
             int slotSize = (int)(bgW * 0.08f);
             int gap = (int)(bgW * 0.004f);
             
-            int invStartX = left + (int)(bgW * 0.22f);
-            int invStartY = top + (int)(bgH * 0.45f);
+            int invStartX = left + (int)(bgW * 0.25f);
+            int invStartY = top + (int)(bgH * 0.42f);
             for (int row = 0; row < 3; row++) {
                 for (int i = 0; i < 9; i++) {
                     int sx = invStartX + i * (slotSize + gap);
