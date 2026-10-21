@@ -203,8 +203,8 @@ public class MainActivity extends Activity {
                     int slotSize = (int)(bgW * 0.08f);
                     int hGap = (int)(bgW * 0.004f);
                     
-                    int invStartX = left + (int)(bgW * 0.25f);
-                    int invStartY = top + (int)(bgH * 0.42f);
+                    int invStartX = left + (int)(bgW * 0.22f);
+                    int invStartY = top + (int)(bgH * 0.45f);
                     int hotbarY = top + (int)(bgH * 0.82f);
                     int craftX = left + (int)(bgW * 0.58f);
                     int craftY = top + (int)(bgH * 0.10f);
@@ -308,8 +308,8 @@ public class MainActivity extends Activity {
                     int left = (W - bgW) / 2, top = (H - bgH) / 2;
                     int slotSize = (int)(bgW * 0.08f);
                     int hGap = (int)(bgW * 0.004f);
-                    int invStartX = left + (int)(bgW * 0.25f);
-                    int invStartY = top + (int)(bgH * 0.42f);
+                    int invStartX = left + (int)(bgW * 0.22f);
+                    int invStartY = top + (int)(bgH * 0.45f);
                     int hotbarY = top + (int)(bgH * 0.82f);
                     
                     int currentSlot = -1;
@@ -685,7 +685,7 @@ public class MainActivity extends Activity {
     private java.util.HashMap<Integer, android.graphics.Bitmap> bitmapCache = new java.util.HashMap<>();
     private android.graphics.Bitmap getCachedBitmap(int resId) {
         if (bitmapCache.containsKey(resId)) return bitmapCache.get(resId);
-        android.graphics.Bitmap bmp = android.graphics.BitmapFactory.decodeResource(getResources(), resId);
+        android.graphics.Bitmap bmp = getCachedBitmap(resId);
         bitmapCache.put(resId, bmp);
         return bmp;
     }
@@ -704,7 +704,7 @@ private void drawSlot(Canvas c, int sx, int sy, int slotSize, Inventory.Slot slo
                 case Block.MEAT: resId = R.drawable.sheep_face; break;
             }
             if (resId != 0) {
-                android.graphics.Bitmap bmp = android.graphics.BitmapFactory.decodeResource(getResources(), resId);
+                android.graphics.Bitmap bmp = getCachedBitmap(resId);
                 if (bmp != null) {
                     android.graphics.Rect src = new android.graphics.Rect(0, 0, bmp.getWidth(), bmp.getHeight());
                     android.graphics.Rect dst = new android.graphics.Rect(sx + 5, sy + 5, sx + slotSize - 5, sy + slotSize - 5);
@@ -776,8 +776,8 @@ private void drawSlot(Canvas c, int sx, int sy, int slotSize, Inventory.Slot slo
             int slotSize = (int)(bgW * 0.08f);
             int gap = (int)(bgW * 0.004f);
             
-            int invStartX = left + (int)(bgW * 0.25f);
-            int invStartY = top + (int)(bgH * 0.42f);
+            int invStartX = left + (int)(bgW * 0.22f);
+            int invStartY = top + (int)(bgH * 0.45f);
             for (int row = 0; row < 3; row++) {
                 for (int i = 0; i < 9; i++) {
                     int sx = invStartX + i * (slotSize + gap);
