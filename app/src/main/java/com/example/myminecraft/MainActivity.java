@@ -189,12 +189,21 @@ public class MainActivity extends Activity {
         float cy1 = btnStartY, cy2 = btnStartY + bSize + gap, cy3 = btnStartY + (bSize + gap) * 2;
 
         if (action == MotionEvent.ACTION_DOWN || action == MotionEvent.ACTION_POINTER_DOWN) {
-
-        if (inventoryOpen || craftingOpen) {
-            float scale = Math.min((float) getWidth() / bgBitmap.getWidth(), (float) getHeight() / bgBitmap.getHeight()) * 0.9f;
+            float x = event.getX(index), y = event.getY(index);
+            int pId = event.getPointerId(index);
+            
+            if (settingsOpen) {
+                if (handleSettingsUIDown(x, y, W, H)) { overlay.invalidate(); return true; }
+                else { isScrollingSettings = true; lastScrollY = y; return true; }
+            }
+            
+            if (craftingOpen) { handleCraftingUIDown(x, y, W, H); overlay.invalidate(); return true; }
+            
+            if (inventoryOpen || craftingOpen) {
+            float scale = Math.min((float) W / bgBitmap.getWidth(), (float) H / bgBitmap.getHeight()) * 0.9f;
             int bgW = (int)(bgBitmap.getWidth() * scale);
             int bgH = (int)(bgBitmap.getHeight() * scale);
-            int left = (getWidth() - bgW) / 2, top = (getHeight() - bgH) / 2;
+            int left = (W - bgW) / 2, top = (H - bgH) / 2;
             int slotSize = (int)(bgW * 0.09f);
             int gap = (int)(bgW * 0.005f);
             
@@ -245,68 +254,6 @@ public class MainActivity extends Activity {
                 return true;
             }
         }
-
-            float x = event.getX(index), y = event.getY(index);
-            int pId = event.getPointerId(index);
-            
-            if (settingsOpen) {
-                if (handleSettingsUIDown(x, y, W, H)) { overlay.invalidate(); return true; }
-                else { isScrollingSettings = true; lastScrollY = y; return true; }
-            }
-            
-            if (craftingOpen) { handleCraftingUIDown(x, y, W, H); overlay.invalidate(); return true; }
-            
-            if (inventoryOpen) {
-                if (inCircle(x, y, W - 150, 150, 60 * scale)) { inventoryOpen = false; Inventory.movingSlot = -1; return true; }
-                if (x > 50 && x < 250 && y > 60 && y < 120) { craftingOpen = true; Inventory.movingSlot = -1; inventoryOpen = false; Inventory.movingSlot = -1; return true; }
-                
-                float bgScale = Math.min((float) W / bgBitmap.getWidth(), (float) H / bgBitmap.getHeight()) * 0.9f;
-                    int bgW = (int)(bgBitmap.getWidth() * bgScale);
-                    int bgH = (int)(bgBitmap.getHeight() * bgScale);
-                    int left = (W - bgW) / 2, top = (H - bgH) / 2;
-                    int slotSize = (int)(bgW * 0.09f);
-                    int hGap = (int)(bgW * 0.005f);
-                int invStartX = left + (int)(bgW * 0.02f), invStartY = top + (int)(bgH * 0.48f);
-                
-                for (int row = 0; row < 3; row++) {
-                    for (int i = 0; i < 9; i++) {
-                        int sx = invStartX + i*(slotSize+hGap);
-                        int sy = invStartY + row*(slotSize+hGap);
-                        if (x >= sx && x <= sx + slotSize && y >= sy && y <= sy + slotSize) {
-                            int idx = 9 + row * 9 + i;
-                            if (Inventory.movingSlot == -1) { 
-                                if (Inventory.slots[idx].type != Block.AIR) {
-                                    Inventory.movingSlot = idx; 
-                                    dragOriginalCount = Inventory.slots[idx].count;
-                                    swipedSlots.clear();
-                                }
-                            } else { 
-                                if (Inventory.movingSlot == idx) Inventory.movingSlot = -1; 
-                                else { Inventory.swapSlots(Inventory.movingSlot, idx); Inventory.movingSlot = -1; }
-                            }
-                            return true;
-                        }
-                    }
-                }
-                int hotbarY = top + (int)(bgH * 0.85f);
-                for (int i = 0; i < 9; i++) {
-                    int sx = invStartX + i*(slotSize+hGap);
-                    if (x >= sx && x <= sx + slotSize && y >= hotbarY && y <= hotbarY + slotSize) {
-                        if (Inventory.movingSlot == -1) { 
-                            if (Inventory.slots[i].type != Block.AIR) {
-                                Inventory.movingSlot = i; 
-                                dragOriginalCount = Inventory.slots[i].count;
-                                swipedSlots.clear();
-                            }
-                        } else { 
-                            if (Inventory.movingSlot == i) Inventory.movingSlot = -1; 
-                            else { Inventory.swapSlots(Inventory.movingSlot, i); Inventory.movingSlot = -1; }
-                        }
-                        return true;
-                    }
-                }
-                return true;
-            }
             
             if (handleUIDown(x, y, W, H)) { overlay.invalidate(); return true; }
             if (chatInput.getVisibility() == View.VISIBLE) return true;
@@ -325,11 +272,11 @@ public class MainActivity extends Activity {
         else if (action == MotionEvent.ACTION_MOVE) {
             if (inventoryOpen && Inventory.movingSlot != -1) {
                 float bgScale = Math.min((float) W / bgBitmap.getWidth(), (float) H / bgBitmap.getHeight()) * 0.9f;
-                    int bgW = (int)(bgBitmap.getWidth() * bgScale);
-                    int bgH = (int)(bgBitmap.getHeight() * bgScale);
-                    int left = (W - bgW) / 2, top = (H - bgH) / 2;
-                    int slotSize = (int)(bgW * 0.09f);
-                    int hGap = (int)(bgW * 0.005f);
+int bgW = (int)(bgBitmap.getWidth() * bgScale);
+int bgH = (int)(bgBitmap.getHeight() * bgScale);
+int left = (W - bgW) / 2, top = (H - bgH) / 2;
+int slotSize = (int)(bgW * 0.09f);
+int hGap = (int)(bgW * 0.005f);
                 int invStartX = left + (int)(bgW * 0.02f), invStartY = top + (int)(bgH * 0.48f);
                 float x = event.getX(index), y = event.getY(index);
                 int currentSlot = -1;
@@ -711,8 +658,11 @@ public class MainActivity extends Activity {
         return bmp;
     }
 
-private void drawSlot(Canvas c, int sx, int sy, int slotSize, Inventory.Slot slot, boolean isSelected, boolean isMoving) {
-        // УБРАЛИ ОТРИСОВКУ ФОНА И РАМОК, т.к. они уже есть на картинке!
+    private void drawSlot(Canvas c, int sx, int sy, int slotSize, Inventory.Slot slot, boolean isSelected, boolean isMoving) {
+        Paint p = new Paint(Paint.ANTI_ALIAS_FLAG); p.setStyle(Paint.Style.FILL);
+        p.setColor(Color.argb(isSelected ? 220 : 100, 0, 0, 0));
+        c.drawRect(sx, sy, sx+slotSize, sy+slotSize, p);
+        c.drawRect(sx, sy, sx+slotSize, sy+slotSize, stroke);
         
         if (slot.type != Block.AIR) {
             int resId = 0;
@@ -727,13 +677,11 @@ private void drawSlot(Canvas c, int sx, int sy, int slotSize, Inventory.Slot slo
                 case Block.MEAT: resId = R.drawable.sheep_face; break;
             }
             if (resId != 0) {
-                android.graphics.Bitmap bmp = android.graphics.BitmapFactory.decodeResource(getResources(), resId);
+                android.graphics.Bitmap bmp = getCachedBitmap(resId);
                 if (bmp != null) {
-                    // Немного уменьшаем предмет, чтобы он красиво вписывался в слот на фото
                     android.graphics.Rect src = new android.graphics.Rect(0, 0, bmp.getWidth(), bmp.getHeight());
                     android.graphics.Rect dst = new android.graphics.Rect(sx + 5, sy + 5, sx + slotSize - 5, sy + slotSize - 5);
                     c.drawBitmap(bmp, src, dst, null);
-                    bmp.recycle();
                 }
             }
             if (slot.count > 1) {
