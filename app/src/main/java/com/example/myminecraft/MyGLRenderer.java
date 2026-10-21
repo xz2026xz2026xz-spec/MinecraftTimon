@@ -52,8 +52,8 @@ public class MyGLRenderer implements GLSurfaceView.Renderer {
         float epsilon = 0.001f;
         float u1 = col * tileStep + epsilon;
         float u2 = (col + 1) * tileStep - epsilon;
-        float v2 = 1.0f - (row * tileStep) - epsilon;
-        float v1 = 1.0f - ((row + 1) * tileStep) + epsilon;
+        float v1 = row * tileStep + epsilon;
+        float v2 = (row + 1) * tileStep - epsilon;
         
         float[] tCoords = new float[72];
         for(int i=0; i<6; i++) {
@@ -64,7 +64,6 @@ public class MyGLRenderer implements GLSurfaceView.Renderer {
         ByteBuffer tb = ByteBuffer.allocateDirect(tCoords.length * 4); tb.order(ByteOrder.nativeOrder());
         FloatBuffer texBuf = tb.asFloatBuffer(); texBuf.put(tCoords); texBuf.position(0);
         return texBuf;
-    }
     }
     
     private void buildMobsMesh() {
