@@ -30,6 +30,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 public class MainActivity extends Activity {
+    public android.graphics.Bitmap bgBitmap;
     private GLSurfaceView glView;
     private MyGLRenderer renderer;
     private OverlayView overlay;
