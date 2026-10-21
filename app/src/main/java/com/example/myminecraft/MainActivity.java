@@ -200,16 +200,16 @@ public class MainActivity extends Activity {
                     int bgW = (int)(bgBitmap.getWidth() * bgScale);
                     int bgH = (int)(bgBitmap.getHeight() * bgScale);
                     int left = (W - bgW) / 2, top = (H - bgH) / 2;
-                    int slotSize = (int)(bgW * 0.09f);
-                    int hGap = (int)(bgW * 0.005f);
+                    int slotSize = (int)(bgW * 0.08f);
+                    int hGap = (int)(bgW * 0.004f);
                     
-                    int invStartX = left + (int)(bgW * 0.02f);
-                    int invStartY = top + (int)(bgH * 0.48f);
-                    int hotbarY = top + (int)(bgH * 0.85f);
-                    int craftX = left + (int)(bgW * 0.56f);
-                    int craftY = top + (int)(bgH * 0.08f);
-                    int outX = left + (int)(bgW * 0.82f);
-                    int outY = top + (int)(bgH * 0.13f);
+                    int invStartX = left + (int)(bgW * 0.22f);
+                    int invStartY = top + (int)(bgH * 0.45f);
+                    int hotbarY = top + (int)(bgH * 0.82f);
+                    int craftX = left + (int)(bgW * 0.58f);
+                    int craftY = top + (int)(bgH * 0.10f);
+                    int outX = left + (int)(bgW * 0.80f);
+                    int outY = top + (int)(bgH * 0.15f);
 
                     if (Math.pow(x - (left + bgW - 40), 2) + Math.pow(y - (top + 40), 2) < 2500) {
                         inventoryOpen = false; craftingOpen = false; Inventory.movingSlot = -1; overlay.invalidate(); return true;
@@ -273,14 +273,16 @@ public class MainActivity extends Activity {
                 chatInput.setVisibility(View.VISIBLE); chatInput.requestFocus();
                 InputMethodManager imm = (InputMethodManager) getSystemService(Context.INPUT_METHOD_SERVICE);
                 imm.showSoftInput(chatInput, InputMethodManager.SHOW_IMPLICIT);
+                overlay.invalidate();
                 return true;
             } else if (inCircle(x, y, W - 230 * scale, 60 * scale, 45 * scale)) {
                 renderer.player.thirdPerson = !renderer.player.thirdPerson;
+                overlay.invalidate();
                 return true;
             } else if (inCircle(x, y, W - 140 * scale, 60 * scale, 45 * scale)) {
-                inventoryOpen = true; Inventory.movingSlot = -1; return true;
+                inventoryOpen = true; Inventory.movingSlot = -1; overlay.invalidate(); return true;
             } else if (inCircle(x, y, W - 50 * scale, 60 * scale, 45 * scale)) {
-                settingsOpen = true; Inventory.movingSlot = -1; return true;
+                settingsOpen = true; Inventory.movingSlot = -1; overlay.invalidate(); return true;
             }
 
             boolean isJoySide = leftHanded ? (x > W / 2) : (x < W / 2);
@@ -304,11 +306,11 @@ public class MainActivity extends Activity {
                     int bgW = (int)(bgBitmap.getWidth() * bgScale);
                     int bgH = (int)(bgBitmap.getHeight() * bgScale);
                     int left = (W - bgW) / 2, top = (H - bgH) / 2;
-                    int slotSize = (int)(bgW * 0.09f);
-                    int hGap = (int)(bgW * 0.005f);
-                    int invStartX = left + (int)(bgW * 0.02f);
-                    int invStartY = top + (int)(bgH * 0.48f);
-                    int hotbarY = top + (int)(bgH * 0.85f);
+                    int slotSize = (int)(bgW * 0.08f);
+                    int hGap = (int)(bgW * 0.004f);
+                    int invStartX = left + (int)(bgW * 0.22f);
+                    int invStartY = top + (int)(bgH * 0.45f);
+                    int hotbarY = top + (int)(bgH * 0.82f);
                     
                     int currentSlot = -1;
                     for (int row = 0; row < 3; row++) {
@@ -774,11 +776,11 @@ private void drawSlot(Canvas c, int sx, int sy, int slotSize, Inventory.Slot slo
                 skin.recycle();
             }
 
-            int slotSize = (int)(bgW * 0.09f);
-            int gap = (int)(bgW * 0.005f);
+            int slotSize = (int)(bgW * 0.08f);
+            int gap = (int)(bgW * 0.004f);
             
-            int invStartX = left + (int)(bgW * 0.02f);
-            int invStartY = top + (int)(bgH * 0.48f);
+            int invStartX = left + (int)(bgW * 0.22f);
+            int invStartY = top + (int)(bgH * 0.45f);
             for (int row = 0; row < 3; row++) {
                 for (int i = 0; i < 9; i++) {
                     int sx = invStartX + i * (slotSize + gap);
@@ -787,7 +789,7 @@ private void drawSlot(Canvas c, int sx, int sy, int slotSize, Inventory.Slot slo
                 }
             }
             
-            int hotbarY = top + (int)(bgH * 0.85f);
+            int hotbarY = top + (int)(bgH * 0.82f);
             for (int i = 0; i < 9; i++) {
                 int sx = invStartX + i * (slotSize + gap);
             Paint hotbarBg = new Paint(); hotbarBg.setColor(Color.argb(120, 0, 0, 0));
@@ -796,16 +798,16 @@ private void drawSlot(Canvas c, int sx, int sy, int slotSize, Inventory.Slot slo
                 drawSlot(c, sx, hotbarY, slotSize, Inventory.slots[i], i == Inventory.selectedSlot, i == Inventory.movingSlot);
             }
             
-            int craftX = left + (int)(bgW * 0.56f);
-            int craftY = top + (int)(bgH * 0.08f);
+            int craftX = left + (int)(bgW * 0.58f);
+            int craftY = top + (int)(bgH * 0.10f);
             for (int i = 0; i < 4; i++) {
                 int sx = craftX + (i % 2) * (slotSize + gap);
                 int sy = craftY + (i / 2) * (slotSize + gap);
                 drawSlot(c, sx, sy, slotSize, Inventory.craftGrid[i], false, i + 36 == Inventory.movingSlot);
             }
             
-            int outX = left + (int)(bgW * 0.82f);
-            int outY = top + (int)(bgH * 0.13f);
+            int outX = left + (int)(bgW * 0.80f);
+            int outY = top + (int)(bgH * 0.15f);
             drawSlot(c, outX, outY, slotSize, Inventory.craftOutput, false, 40 == Inventory.movingSlot);
             
             bgBitmap.recycle();
