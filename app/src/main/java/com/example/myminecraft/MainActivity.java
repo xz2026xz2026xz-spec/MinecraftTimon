@@ -179,18 +179,29 @@ public class MainActivity extends Activity {
         int W = glView.getWidth(), H = glView.getHeight();
         float scale = getUiScale();
 
+        moveCenterX = leftHanded ? W - 160 * scale : 160 * scale;
+        moveCenterY = H - 160 * scale;
+
+        float bSize = 120 * scale, gap = 15 * scale;
+        float btnStartX = leftHanded ? 20 * scale : W - (bSize * 2 + gap) - 20 * scale;
+        float btnStartY = H - (bSize * 3 + gap * 2) - 200 * scale;
+        float cx1 = btnStartX, cx2 = btnStartX + bSize + gap;
+        float cy1 = btnStartY, cy2 = btnStartY + bSize + gap, cy3 = btnStartY + (bSize + gap) * 2;
+
         if (action == MotionEvent.ACTION_DOWN || action == MotionEvent.ACTION_POINTER_DOWN) {
             float x = event.getX(index), y = event.getY(index);
             int pId = event.getPointerId(index);
 
             if (inventoryOpen || craftingOpen) {
+                if (bgBitmap == null) bgBitmap = android.graphics.BitmapFactory.decodeResource(getResources(), R.drawable.inventory_bg);
                 if (bgBitmap != null) {
                     float bgScale = Math.min((float) W / bgBitmap.getWidth(), (float) H / bgBitmap.getHeight()) * 0.9f;
                     int bgW = (int)(bgBitmap.getWidth() * bgScale);
                     int bgH = (int)(bgBitmap.getHeight() * bgScale);
                     int left = (W - bgW) / 2, top = (H - bgH) / 2;
                     int slotSize = (int)(bgW * 0.09f);
-                    int gap = (int)(bgW * 0.005f);
+                    int hGap = (int)(bgW * 0.005f);
+                    
                     int invStartX = left + (int)(bgW * 0.02f);
                     int invStartY = top + (int)(bgH * 0.48f);
                     int hotbarY = top + (int)(bgH * 0.85f);
@@ -206,19 +217,19 @@ public class MainActivity extends Activity {
                     int clickedSlot = -1;
                     for (int row = 0; row < 3; row++) {
                         for (int j = 0; j < 9; j++) {
-                            int sx = invStartX + j * (slotSize + gap);
-                            int sy = invStartY + row * (slotSize + gap);
+                            int sx = invStartX + j * (slotSize + hGap);
+                            int sy = invStartY + row * (slotSize + hGap);
                             if (x >= sx && x <= sx + slotSize && y >= sy && y <= sy + slotSize) clickedSlot = 9 + row * 9 + j;
                         }
                     }
                     for (int j = 0; j < 9; j++) {
-                        int sx = invStartX + j * (slotSize + gap);
+                        int sx = invStartX + j * (slotSize + hGap);
                         if (x >= sx && x <= sx + slotSize && y >= hotbarY && y <= hotbarY + slotSize) clickedSlot = j;
                     }
                     if (craftingOpen) {
                         for (int j = 0; j < 4; j++) {
-                            int sx = craftX + (j % 2) * (slotSize + gap);
-                            int sy = craftY + (j / 2) * (slotSize + gap);
+                            int sx = craftX + (j % 2) * (slotSize + hGap);
+                            int sy = craftY + (j / 2) * (slotSize + hGap);
                             if (x >= sx && x <= sx + slotSize && y >= sy && y <= sy + slotSize) clickedSlot = 36 + j;
                         }
                         if (x >= outX && x <= outX + slotSize && y >= outY && y <= outY + slotSize) clickedSlot = 40;
@@ -255,7 +266,6 @@ public class MainActivity extends Activity {
                 if (handleSettingsUIDown(x, y, W, H)) { overlay.invalidate(); return true; }
                 else { isScrollingSettings = true; lastScrollY = y; return true; }
             }
-            
             if (craftingOpen) return true;
 
             boolean isJoySide = leftHanded ? (x > W / 2) : (x < W / 2);
@@ -267,6 +277,7 @@ public class MainActivity extends Activity {
             else if (inBtn(x, y, cx1, cy3, bSize) && bPlaceId == -1) { bPlaceId = pId; doAction(false); }
             else if (inBtn(x, y, cx2, cy3, bSize) && bSneakId == -1) { bSneakId = pId; renderer.player.sneaking = true; }
             else if (!isJoySide && lookPointerId == -1) { lookPointerId = pId; lastSwipeX = x; lastSwipeY = y; }
+            
             overlay.invalidate();
             return true;
         }
@@ -279,7 +290,7 @@ public class MainActivity extends Activity {
                     int bgH = (int)(bgBitmap.getHeight() * bgScale);
                     int left = (W - bgW) / 2, top = (H - bgH) / 2;
                     int slotSize = (int)(bgW * 0.09f);
-                    int gap = (int)(bgW * 0.005f);
+                    int hGap = (int)(bgW * 0.005f);
                     int invStartX = left + (int)(bgW * 0.02f);
                     int invStartY = top + (int)(bgH * 0.48f);
                     int hotbarY = top + (int)(bgH * 0.85f);
@@ -287,13 +298,13 @@ public class MainActivity extends Activity {
                     int currentSlot = -1;
                     for (int row = 0; row < 3; row++) {
                         for (int j = 0; j < 9; j++) {
-                            int sx = invStartX + j * (slotSize + gap);
-                            int sy = invStartY + row * (slotSize + gap);
+                            int sx = invStartX + j * (slotSize + hGap);
+                            int sy = invStartY + row * (slotSize + hGap);
                             if (x >= sx && x <= sx + slotSize && y >= sy && y <= sy + slotSize) currentSlot = 9 + row * 9 + j;
                         }
                     }
                     for (int j = 0; j < 9; j++) {
-                        int sx = invStartX + j * (slotSize + gap);
+                        int sx = invStartX + j * (slotSize + hGap);
                         if (x >= sx && x <= sx + slotSize && y >= hotbarY && y <= hotbarY + slotSize) currentSlot = j;
                     }
 
