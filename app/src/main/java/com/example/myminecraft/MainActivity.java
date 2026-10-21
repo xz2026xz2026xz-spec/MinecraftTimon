@@ -189,6 +189,63 @@ public class MainActivity extends Activity {
         float cy1 = btnStartY, cy2 = btnStartY + bSize + gap, cy3 = btnStartY + (bSize + gap) * 2;
 
         if (action == MotionEvent.ACTION_DOWN || action == MotionEvent.ACTION_POINTER_DOWN) {
+
+        if (inventoryOpen || craftingOpen) {
+            float scale = Math.min((float) getWidth() / bgBitmap.getWidth(), (float) getHeight() / bgBitmap.getHeight()) * 0.9f;
+            int bgW = (int)(bgBitmap.getWidth() * scale);
+            int bgH = (int)(bgBitmap.getHeight() * scale);
+            int left = (getWidth() - bgW) / 2, top = (getHeight() - bgH) / 2;
+            int slotSize = (int)(bgW * 0.09f);
+            int gap = (int)(bgW * 0.005f);
+            
+            int clickedSlot = -1;
+            
+            int invStartX = left + (int)(bgW * 0.02f);
+            int invStartY = top + (int)(bgH * 0.48f);
+            for (int row = 0; row < 3; row++) {
+                for (int i = 0; i < 9; i++) {
+                    int sx = invStartX + i * (slotSize + gap);
+                    int sy = invStartY + row * (slotSize + gap);
+                    if (x >= sx && x <= sx + slotSize && y >= sy && y <= sy + slotSize) clickedSlot = 9 + row * 9 + i;
+                }
+            }
+            
+            int hotbarY = top + (int)(bgH * 0.85f);
+            for (int i = 0; i < 9; i++) {
+                int sx = invStartX + i * (slotSize + gap);
+                if (x >= sx && x <= sx + slotSize && y >= hotbarY && y <= hotbarY + slotSize) clickedSlot = i;
+            }
+            
+            int craftX = left + (int)(bgW * 0.56f);
+            int craftY = top + (int)(bgH * 0.08f);
+            for (int i = 0; i < 4; i++) {
+                int sx = craftX + (i % 2) * (slotSize + gap);
+                int sy = craftY + (i / 2) * (slotSize + gap);
+                if (x >= sx && x <= sx + slotSize && y >= sy && y <= sy + slotSize) clickedSlot = 36 + i;
+            }
+            
+            int outX = left + (int)(bgW * 0.82f);
+            int outY = top + (int)(bgH * 0.13f);
+            if (x >= outX && x <= outX + slotSize && y >= outY && y <= outY + slotSize) clickedSlot = 40;
+
+            if (clickedSlot != -1) {
+                if (Inventory.movingSlot == -1) {
+                    if (clickedSlot == 40) Inventory.takeCraftResult();
+                    else {
+                        Inventory.Slot s = (clickedSlot >= 36 && clickedSlot < 40) ? Inventory.craftGrid[clickedSlot - 36] : Inventory.slots[clickedSlot];
+                        if (s.type != Block.AIR) Inventory.movingSlot = clickedSlot;
+                    }
+                } else {
+                    if (clickedSlot != 40) {
+                        Inventory.swapSlots(Inventory.movingSlot, clickedSlot);
+                        Inventory.movingSlot = -1;
+                    }
+                }
+                overlay.invalidate();
+                return true;
+            }
+        }
+
             float x = event.getX(index), y = event.getY(index);
             int pId = event.getPointerId(index);
             
@@ -644,38 +701,39 @@ public class MainActivity extends Activity {
         return bmp;
     }
 
-    private void drawSlot(Canvas c, int sx, int sy, int slotSize, Inventory.Slot slot, boolean isSelected, boolean isMoving) {
-        Paint p = new Paint(Paint.ANTI_ALIAS_FLAG); p.setStyle(Paint.Style.FILL);
-        p.setColor(Color.argb(isSelected ? 220 : 100, 0, 0, 0));
-        c.drawRect(sx, sy, sx+slotSize, sy+slotSize, p);
-        c.drawRect(sx, sy, sx+slotSize, sy+slotSize, stroke);
-        
-        if (slot.type != Block.AIR) {
-            int resId = 0;
-            switch(slot.type) {
-                case Block.GRASS: resId = R.drawable.grass_top; break;
-                case Block.DIRT: resId = R.drawable.dirt; break;
-                case Block.STONE: resId = R.drawable.stone; break;
-                case Block.WOOD: resId = R.drawable.wood_side; break;
-                case Block.LEAVES: resId = R.drawable.leaves; break;
-                case Block.PLANKS: resId = R.drawable.planks; break;
-                case Block.COBBLESTONE: resId = R.drawable.cobblestone; break;
-                case Block.MEAT: resId = R.drawable.sheep_face; break;
-            }
-            if (resId != 0) {
-                android.graphics.Bitmap bmp = getCachedBitmap(resId);
-                if (bmp != null) {
-                    android.graphics.Rect src = new android.graphics.Rect(0, 0, bmp.getWidth(), bmp.getHeight());
-                    android.graphics.Rect dst = new android.graphics.Rect(sx + 5, sy + 5, sx + slotSize - 5, sy + slotSize - 5);
-                    c.drawBitmap(bmp, src, dst, null);
-                }
-            }
-            if (slot.count > 1) {
-                text.setTextSize(slotSize * 0.3f); text.setTextAlign(Paint.Align.RIGHT);
-                c.drawText(String.valueOf(slot.count), sx + slotSize - 5, sy + slotSize - 5, text);
+private void drawSlot(Canvas c, int sx, int sy, int slotSize, Inventory.Slot slot, boolean isSelected, boolean isMoving) {
+    Paint p = new Paint(Paint.ANTI_ALIAS_FLAG); p.setStyle(Paint.Style.FILL);
+    p.setColor(Color.argb(isSelected ? 220 : 100, 0, 0, 0));
+    c.drawRect(sx, sy, sx+slotSize, sy+slotSize, p);
+    c.drawRect(sx, sy, sx+slotSize, sy+slotSize, stroke);
+    
+    if (slot.type != Block.AIR) {
+        int resId = 0;
+        switch(slot.type) {
+            case Block.GRASS: resId = R.drawable.grass_top; break;
+            case Block.DIRT: resId = R.drawable.dirt; break;
+            case Block.STONE: resId = R.drawable.stone; break;
+            case Block.WOOD: resId = R.drawable.wood_side; break;
+            case Block.LEAVES: resId = R.drawable.leaves; break;
+            case Block.PLANKS: resId = R.drawable.planks; break;
+            case Block.COBBLESTONE: resId = R.drawable.cobblestone; break;
+            case Block.MEAT: resId = R.drawable.sheep_face; break;
+        }
+        if (resId != 0) {
+            android.graphics.Bitmap bmp = android.graphics.BitmapFactory.decodeResource(getResources(), resId);
+            if (bmp != null) {
+                android.graphics.Rect src = new android.graphics.Rect(0, 0, bmp.getWidth(), bmp.getHeight());
+                android.graphics.Rect dst = new android.graphics.Rect(sx + 5, sy + 5, sx + slotSize - 5, sy + slotSize - 5);
+                c.drawBitmap(bmp, src, dst, null);
+                bmp.recycle();
             }
         }
+        if (slot.count > 1) {
+            text.setTextSize(slotSize * 0.3f); text.setTextAlign(Paint.Align.RIGHT);
+            c.drawText(String.valueOf(slot.count), sx + slotSize - 5, sy + slotSize - 5, text);
+        }
     }
+}
         
         private void drawCrafting(Canvas c, int W, int H) {
             Paint dim = new Paint(); dim.setColor(Color.argb(220, 0, 0, 0)); c.drawRect(0, 0, W, H, dim);
