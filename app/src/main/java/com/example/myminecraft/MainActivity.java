@@ -269,6 +269,20 @@ public class MainActivity extends Activity {
             }
             if (craftingOpen) return true;
 
+            if (inCircle(x, y, W - 320 * scale, 60 * scale, 45 * scale)) {
+                chatInput.setVisibility(View.VISIBLE); chatInput.requestFocus();
+                InputMethodManager imm = (InputMethodManager) getSystemService(Context.INPUT_METHOD_SERVICE);
+                imm.showSoftInput(chatInput, InputMethodManager.SHOW_IMPLICIT);
+                return true;
+            } else if (inCircle(x, y, W - 230 * scale, 60 * scale, 45 * scale)) {
+                renderer.player.thirdPerson = !renderer.player.thirdPerson;
+                return true;
+            } else if (inCircle(x, y, W - 140 * scale, 60 * scale, 45 * scale)) {
+                inventoryOpen = true; Inventory.movingSlot = -1; return true;
+            } else if (inCircle(x, y, W - 50 * scale, 60 * scale, 45 * scale)) {
+                settingsOpen = true; Inventory.movingSlot = -1; return true;
+            }
+
             boolean isJoySide = leftHanded ? (x > W / 2) : (x < W / 2);
             if (isJoySide && movePointerId == -1) { movePointerId = pId; knobX = x; knobY = y; }
             else if (inBtn(x, y, cx1, cy1, bSize) && bSwordId == -1) { bSwordId = pId; doAction(true); }
@@ -776,6 +790,9 @@ private void drawSlot(Canvas c, int sx, int sy, int slotSize, Inventory.Slot slo
             int hotbarY = top + (int)(bgH * 0.85f);
             for (int i = 0; i < 9; i++) {
                 int sx = invStartX + i * (slotSize + gap);
+            Paint hotbarBg = new Paint(); hotbarBg.setColor(Color.argb(120, 0, 0, 0));
+            c.drawRect(sx, hotbarY, sx + slotSize, hotbarY + slotSize, hotbarBg);
+            c.drawRect(sx, hotbarY, sx + slotSize, hotbarY + slotSize, stroke);
                 drawSlot(c, sx, hotbarY, slotSize, Inventory.slots[i], i == Inventory.selectedSlot, i == Inventory.movingSlot);
             }
             
