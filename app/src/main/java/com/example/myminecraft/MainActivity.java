@@ -204,7 +204,7 @@ public class MainActivity extends Activity {
                     int hGap = (int)(bgW * 0.004f);
                     
                     int invStartX = left + (int)(bgW * 0.18f);
-                    int invStartY = top + (int)(bgH * 0.44f);
+                    int invStartY = top + (int)(bgH * 0.45f);
                     int hotbarY = top + (int)(bgH * 0.82f);
                     int craftX = left + (int)(bgW * 0.58f);
                     int craftY = top + (int)(bgH * 0.10f);
@@ -309,7 +309,7 @@ public class MainActivity extends Activity {
                     int slotSize = (int)(bgW * 0.08f);
                     int hGap = (int)(bgW * 0.004f);
                     int invStartX = left + (int)(bgW * 0.18f);
-                    int invStartY = top + (int)(bgH * 0.44f);
+                    int invStartY = top + (int)(bgH * 0.45f);
                     int hotbarY = top + (int)(bgH * 0.82f);
                     
                     int currentSlot = -1;
@@ -777,7 +777,7 @@ private void drawSlot(Canvas c, int sx, int sy, int slotSize, Inventory.Slot slo
             int gap = (int)(bgW * 0.004f);
             
             int invStartX = left + (int)(bgW * 0.18f);
-            int invStartY = top + (int)(bgH * 0.44f);
+            int invStartY = top + (int)(bgH * 0.45f);
             for (int row = 0; row < 3; row++) {
                 for (int i = 0; i < 9; i++) {
                     int sx = invStartX + i * (slotSize + gap);
