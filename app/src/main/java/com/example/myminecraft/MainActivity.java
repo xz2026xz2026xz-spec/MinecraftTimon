@@ -664,6 +664,9 @@ public class MainActivity extends Activity {
             int hotbarStartX = (W - (9 * slotSize + 8 * hGap)) / 2, hotbarStartY = (int)(H - 140 * scale);
             for (int i = 0; i < 9; i++) {
                 int sx = hotbarStartX + i * (slotSize + hGap);
+            Paint hbBg = new Paint(); hbBg.setColor(Color.argb(150, 0, 0, 0));
+            c.drawRect(sx, hotbarStartY, sx + slotSize, hotbarStartY + slotSize, hbBg);
+            c.drawRect(sx, hotbarStartY, sx + slotSize, hotbarStartY + slotSize, stroke);
                 drawSlot(c, sx, hotbarStartY, slotSize, Inventory.slots[i], i == Inventory.selectedSlot, i == Inventory.movingSlot);
             }
             
