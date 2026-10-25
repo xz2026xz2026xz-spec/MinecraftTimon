@@ -191,6 +191,25 @@ public class MainActivity extends Activity {
 
         if (action == MotionEvent.ACTION_DOWN || action == MotionEvent.ACTION_POINTER_DOWN) {
             float x = event.getX(index), y = event.getY(index);
+            // Проверка нажатия на хотбар
+            if (!inventoryOpen && !settingsOpen && !craftingOpen) {
+                int hSlotSize = (int)(110 * scale);
+                int hGap = (int)(10 * scale);
+                int hStartX = (W - (9 * hSlotSize + 8 * hGap)) / 2;
+                int hStartY = (int)(H - 140 * scale);
+                
+                if (y >= hStartY && y <= hStartY + hSlotSize) {
+                    for (int i = 0; i < 9; i++) {
+                        int sx = hStartX + i * (hSlotSize + hGap);
+                        if (x >= sx && x <= sx + hSlotSize) {
+                            Inventory.selectedSlot = i;
+                            overlay.invalidate();
+                            return true;
+                        }
+                    }
+                }
+            }
+            
             int pId = event.getPointerId(index);
 
             if (inventoryOpen || craftingOpen) {
@@ -301,6 +320,25 @@ public class MainActivity extends Activity {
         else if (action == MotionEvent.ACTION_MOVE) {
             if (inventoryOpen && Inventory.movingSlot != -1) {
                 float x = event.getX(index), y = event.getY(index);
+            // Проверка нажатия на хотбар
+            if (!inventoryOpen && !settingsOpen && !craftingOpen) {
+                int hSlotSize = (int)(110 * scale);
+                int hGap = (int)(10 * scale);
+                int hStartX = (W - (9 * hSlotSize + 8 * hGap)) / 2;
+                int hStartY = (int)(H - 140 * scale);
+                
+                if (y >= hStartY && y <= hStartY + hSlotSize) {
+                    for (int i = 0; i < 9; i++) {
+                        int sx = hStartX + i * (hSlotSize + hGap);
+                        if (x >= sx && x <= sx + hSlotSize) {
+                            Inventory.selectedSlot = i;
+                            overlay.invalidate();
+                            return true;
+                        }
+                    }
+                }
+            }
+            
                 if (bgBitmap != null) {
                     float bgScale = Math.min((float) W / bgBitmap.getWidth(), (float) H / bgBitmap.getHeight()) * 0.9f;
                     int bgW = (int)(bgBitmap.getWidth() * bgScale);
