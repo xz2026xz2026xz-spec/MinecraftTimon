@@ -55,7 +55,7 @@ public class Player {
         }
         
         vy += GRAVITY;
-        if (vy < -0.4f) vy = -0.4f; 
+        if (vy < -0.15f) vy = -0.15f; 
         float newY = y + vy;
         
         // Проверка падения (урон)
