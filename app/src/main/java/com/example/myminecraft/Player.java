@@ -16,8 +16,8 @@ public class Player {
     private int regenTimer = 0;
     
     public static final float GRAVITY = -0.015f;
-    public static final float JUMP = 0.22f;
-    public static final float SPEED = 0.12f; 
+    public static final float JUMP = 0.21f;
+    public static final float SPEED = 0.08f; 
     
     public float moveX = 0f;
     public float moveZ = 0f;
