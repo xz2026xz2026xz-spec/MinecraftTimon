@@ -153,6 +153,18 @@ public class MyGLRenderer implements GLSurfaceView.Renderer {
         int vs = loadShader(GLES20.GL_VERTEX_SHADER, VERTEX_SHADER);
         int fs = loadShader(GLES20.GL_FRAGMENT_SHADER, FRAGMENT_SHADER);
         program = GLES20.glCreateProgram(); GLES20.glAttachShader(program, vs); GLES20.glAttachShader(program, fs); GLES20.glLinkProgram(program);
+        mvpMatrixHandle = GLES20.glGetUniformLocation(program, "uMVPMatrix");
+        positionHandle = GLES20.glGetAttribLocation(program, "vPosition");
+        colorHandle = GLES20.glGetAttribLocation(program, "vColor");
+        texCoordHandle = GLES20.glGetAttribLocation(program, "aTexCoord");
+        textureUniform = GLES20.glGetUniformLocation(program, "uTexture");
+
+        
+        
+        
+        
+        
+
         rebuildAllChunks();
     }
     
@@ -302,12 +314,12 @@ public class MyGLRenderer implements GLSurfaceView.Renderer {
         frustum.update(mvpMatrix);
         
         GLES20.glUseProgram(program);
-        mvpMatrixHandle = GLES20.glGetUniformLocation(program, "uMVPMatrix");
+        
         GLES20.glUniformMatrix4fv(mvpMatrixHandle, 1, false, mvpMatrix, 0);
-        positionHandle = GLES20.glGetAttribLocation(program, "vPosition");
-        colorHandle = GLES20.glGetAttribLocation(program, "vColor");
-        texCoordHandle = GLES20.glGetAttribLocation(program, "aTexCoord");
-        textureUniform = GLES20.glGetUniformLocation(program, "uTexture");
+        
+        
+        
+        
         
         GLES20.glActiveTexture(GLES20.GL_TEXTURE0);
         GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, TextureManager.atlasId);
