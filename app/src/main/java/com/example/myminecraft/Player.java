@@ -15,9 +15,9 @@ public class Player {
     private float fallDistance = 0f;
     private int regenTimer = 0;
     
-    public static final float GRAVITY = -0.015f;
-    public static final float JUMP = 0.21f;
-    public static final float SPEED = 0.08f; 
+    public static final float GRAVITY = -0.0088f;
+    public static final float JUMP = 0.15f;
+    public static final float SPEED = 0.072f; 
     
     public float moveX = 0f;
     public float moveZ = 0f;
@@ -55,7 +55,7 @@ public class Player {
         }
         
         vy += GRAVITY;
-        if (vy < -0.1f) vy = -0.1f; 
+        if (vy < -0.3f) vy = -0.3f; 
         float newY = y + vy;
         
         // Проверка падения (урон)
