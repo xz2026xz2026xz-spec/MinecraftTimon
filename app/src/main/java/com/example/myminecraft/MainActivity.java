@@ -732,6 +732,12 @@ public class MainActivity extends Activity {
     }
 
 private void drawSlot(Canvas c, int sx, int sy, int slotSize, Inventory.Slot slot, boolean isSelected, boolean isMoving) {
+        Paint borderPaint = new Paint();
+        borderPaint.setStyle(Paint.Style.STROKE);
+        borderPaint.setColor(Color.WHITE);
+        borderPaint.setStrokeWidth(3f);
+        c.drawRect(sx, sy, sx + slotSize, sy + slotSize, borderPaint);
+
         // УБРАЛИ ОТРИСОВКУ ФОНА И РАМОК, т.к. они уже есть на картинке!
         
         if (slot.type != Block.AIR) {
