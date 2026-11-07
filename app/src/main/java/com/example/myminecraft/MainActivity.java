@@ -219,15 +219,15 @@ public class MainActivity extends Activity {
                     int bgW = (int)(bgBitmap.getWidth() * bgScale);
                     int bgH = (int)(bgBitmap.getHeight() * bgScale);
                     int left = (W - bgW) / 2, top = (H - bgH) / 2;
-                    int slotSize = (int)(bgW * 0.08f);
-                    int hGap = (int)(bgW * 0.004f);
+                    int slotSize = (int)(bgW * 0.11f);
+                    int hGap = (int)(bgW * 0.002f);
                     
-                    int invStartX = left + (int)(bgW * 0.22f);
+                    int invStartX = left + (int)(bgW * 0.19f);
                     int invStartY = top + (int)(bgH * 0.45f);
                     int hotbarY = top + (int)(bgH * 0.82f);
-                    int craftX = left + (int)(bgW * 0.58f);
+                    int craftX = left + (int)(bgW * 0.60f);
                     int craftY = top + (int)(bgH * 0.10f);
-                    int outX = left + (int)(bgW * 0.80f);
+                    int outX = left + (int)(bgW * 0.83f);
                     int outY = top + (int)(bgH * 0.15f);
 
                     if (Math.pow(x - (left + bgW - 40), 2) + Math.pow(y - (top + 40), 2) < 2500) {
@@ -344,9 +344,9 @@ public class MainActivity extends Activity {
                     int bgW = (int)(bgBitmap.getWidth() * bgScale);
                     int bgH = (int)(bgBitmap.getHeight() * bgScale);
                     int left = (W - bgW) / 2, top = (H - bgH) / 2;
-                    int slotSize = (int)(bgW * 0.08f);
-                    int hGap = (int)(bgW * 0.004f);
-                    int invStartX = left + (int)(bgW * 0.22f);
+                    int slotSize = (int)(bgW * 0.11f);
+                    int hGap = (int)(bgW * 0.002f);
+                    int invStartX = left + (int)(bgW * 0.19f);
                     int invStartY = top + (int)(bgH * 0.45f);
                     int hotbarY = top + (int)(bgH * 0.82f);
                     
@@ -808,7 +808,7 @@ private void drawSlot(Canvas c, int sx, int sy, int slotSize, Inventory.Slot slo
             int left = (W - bgW) / 2, top = (H - bgH) / 2;
             
             android.graphics.Rect dst = new android.graphics.Rect(left, top, left + bgW, top + bgH);
-            c.drawBitmap(bgBitmap, null, dst, null);
+            // c.drawBitmap(bgBitmap, null, dst, null); // Фото убрано
             
             text.setTextSize(60f); text.setTextAlign(Paint.Align.CENTER);
             Paint p = new Paint(); p.setColor(Color.WHITE); p.setStyle(Paint.Style.STROKE); p.setStrokeWidth(6f);
@@ -819,14 +819,14 @@ private void drawSlot(Canvas c, int sx, int sy, int slotSize, Inventory.Slot slo
             if (skin != null) {
                 android.graphics.Rect srcFace = new android.graphics.Rect(8, 8, 16, 16);
                 android.graphics.Rect dstFace = new android.graphics.Rect(left + (int)(bgW * 0.14f), top + (int)(bgH * 0.10f), left + (int)(bgW * 0.24f), top + (int)(bgH * 0.25f));
-                c.drawBitmap(skin, srcFace, dstFace, null);
+                // c.drawBitmap(skin, srcFace, dstFace, null); // Скин убран
                 skin.recycle();
             }
 
-            int slotSize = (int)(bgW * 0.08f);
-            int gap = (int)(bgW * 0.004f);
+            int slotSize = (int)(bgW * 0.11f);
+            int gap = (int)(bgW * 0.002f);
             
-            int invStartX = left + (int)(bgW * 0.22f);
+            int invStartX = left + (int)(bgW * 0.19f);
             int invStartY = top + (int)(bgH * 0.45f);
             for (int row = 0; row < 3; row++) {
                 for (int i = 0; i < 9; i++) {
@@ -845,7 +845,7 @@ private void drawSlot(Canvas c, int sx, int sy, int slotSize, Inventory.Slot slo
                 drawSlot(c, sx, hotbarY, slotSize, Inventory.slots[i], i == Inventory.selectedSlot, i == Inventory.movingSlot);
             }
             
-            int craftX = left + (int)(bgW * 0.58f);
+            int craftX = left + (int)(bgW * 0.60f);
             int craftY = top + (int)(bgH * 0.10f);
             for (int i = 0; i < 4; i++) {
                 int sx = craftX + (i % 2) * (slotSize + gap);
@@ -853,7 +853,7 @@ private void drawSlot(Canvas c, int sx, int sy, int slotSize, Inventory.Slot slo
                 drawSlot(c, sx, sy, slotSize, Inventory.craftGrid[i], false, i + 36 == Inventory.movingSlot);
             }
             
-            int outX = left + (int)(bgW * 0.80f);
+            int outX = left + (int)(bgW * 0.83f);
             int outY = top + (int)(bgH * 0.15f);
             drawSlot(c, outX, outY, slotSize, Inventory.craftOutput, false, 40 == Inventory.movingSlot);
             
