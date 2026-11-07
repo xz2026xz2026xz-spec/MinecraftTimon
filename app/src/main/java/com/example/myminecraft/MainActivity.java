@@ -808,7 +808,7 @@ private void drawSlot(Canvas c, int sx, int sy, int slotSize, Inventory.Slot slo
             int left = (W - bgW) / 2, top = (H - bgH) / 2;
             
             android.graphics.Rect dst = new android.graphics.Rect(left, top, left + bgW, top + bgH);
-            // c.drawBitmap(bgBitmap, null, dst, null); // Фото убрано
+            // // c.drawBitmap(bgBitmap, null, dst, null); // Фото убрано
             
             text.setTextSize(60f); text.setTextAlign(Paint.Align.CENTER);
             Paint p = new Paint(); p.setColor(Color.WHITE); p.setStyle(Paint.Style.STROKE); p.setStrokeWidth(6f);
