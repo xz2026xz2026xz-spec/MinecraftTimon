@@ -218,7 +218,7 @@ public class MainActivity extends Activity {
                     float bgScale = Math.min((float) W / bgBitmap.getWidth(), (float) H / bgBitmap.getHeight()) * 0.9f;
                     int bgW = (int)(bgBitmap.getWidth() * bgScale);
                     int bgH = (int)(bgBitmap.getHeight() * bgScale);
-                    int left = (W - bgW) / 2, top = (H - bgH) / 2;
+                    int left = (W - bgW) / 2 - (int)(W * 0.15f), top = (H - bgH) / 2;
                     int slotSize = (int)(bgW * 0.11f);
                     int hGap = (int)(bgW * 0.002f);
                     
@@ -343,7 +343,7 @@ public class MainActivity extends Activity {
                     float bgScale = Math.min((float) W / bgBitmap.getWidth(), (float) H / bgBitmap.getHeight()) * 0.9f;
                     int bgW = (int)(bgBitmap.getWidth() * bgScale);
                     int bgH = (int)(bgBitmap.getHeight() * bgScale);
-                    int left = (W - bgW) / 2, top = (H - bgH) / 2;
+                    int left = (W - bgW) / 2 - (int)(W * 0.15f), top = (H - bgH) / 2;
                     int slotSize = (int)(bgW * 0.11f);
                     int hGap = (int)(bgW * 0.002f);
                     int invStartX = left + (int)(bgW * 0.19f);
@@ -732,6 +732,12 @@ public class MainActivity extends Activity {
     }
 
 private void drawSlot(Canvas c, int sx, int sy, int slotSize, Inventory.Slot slot, boolean isSelected, boolean isMoving) {
+        if (isSelected || isMoving) {
+            Paint highlightPaint = new Paint();
+            highlightPaint.setColor(Color.argb(100, 255, 255, 255)); // Полупрозрачный белый
+            c.drawRect(sx, sy, sx + slotSize, sy + slotSize, highlightPaint);
+        }
+
         Paint borderPaint = new Paint();
         borderPaint.setStyle(Paint.Style.STROKE);
         borderPaint.setColor(Color.WHITE);
@@ -805,7 +811,7 @@ private void drawSlot(Canvas c, int sx, int sy, int slotSize, Inventory.Slot slo
             float scale = Math.min((float) W / bgBitmap.getWidth(), (float) H / bgBitmap.getHeight()) * 0.9f;
             int bgW = (int)(bgBitmap.getWidth() * scale);
             int bgH = (int)(bgBitmap.getHeight() * scale);
-            int left = (W - bgW) / 2, top = (H - bgH) / 2;
+            int left = (W - bgW) / 2 - (int)(W * 0.15f), top = (H - bgH) / 2;
             
             android.graphics.Rect dst = new android.graphics.Rect(left, top, left + bgW, top + bgH);
             // // c.drawBitmap(bgBitmap, null, dst, null); // Фото убрано
