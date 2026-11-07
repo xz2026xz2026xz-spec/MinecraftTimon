@@ -182,7 +182,6 @@ public class MainActivity extends Activity {
 
         moveCenterX = leftHanded ? W - 160 * scale : 160 * scale;
         moveCenterY = H - 160 * scale;
-
         float bSize = 120 * scale, gap = 15 * scale;
         float btnStartX = leftHanded ? 20 * scale : W - (bSize * 2 + gap) - 20 * scale;
         float btnStartY = H - (bSize * 3 + gap * 2) - 200 * scale;
@@ -191,27 +190,24 @@ public class MainActivity extends Activity {
 
         if (action == MotionEvent.ACTION_DOWN || action == MotionEvent.ACTION_POINTER_DOWN) {
             float x = event.getX(index), y = event.getY(index);
-            // Проверка нажатия на хотбар
-            if (!inventoryOpen && !settingsOpen && !craftingOpen) {
-                int hSlotSize = (int)(110 * scale);
-                int hGap = (int)(10 * scale);
-                int hStartX = (W - (9 * hSlotSize + 8 * hGap)) / 2;
-                int hStartY = (int)(H - 140 * scale);
-                
-                if (y >= hStartY && y <= hStartY + hSlotSize) {
-                    for (int i = 0; i < 9; i++) {
-                        int sx = hStartX + i * (hSlotSize + hGap);
-                        if (x >= sx && x <= sx + hSlotSize) {
-                            Inventory.selectedSlot = i;
-                            overlay.invalidate();
-                            return true;
-                        }
-                    }
-                }
-            }
-            
             int pId = event.getPointerId(index);
 
+            // ВЕРХНИЕ КНОПКИ
+            if (inCircle(x, y, W - 320 * scale, 60 * scale, 45 * scale)) {
+                chatInput.setVisibility(View.VISIBLE); chatInput.requestFocus();
+                InputMethodManager imm = (InputMethodManager) getSystemService(Context.INPUT_METHOD_SERVICE);
+                imm.showSoftInput(chatInput, InputMethodManager.SHOW_IMPLICIT);
+                overlay.invalidate(); return true;
+            } else if (inCircle(x, y, W - 230 * scale, 60 * scale, 45 * scale)) {
+                renderer.player.thirdPerson = !renderer.player.thirdPerson;
+                overlay.invalidate(); return true;
+            } else if (inCircle(x, y, W - 140 * scale, 60 * scale, 45 * scale)) {
+                inventoryOpen = true; Inventory.movingSlot = -1; overlay.invalidate(); return true;
+            } else if (inCircle(x, y, W - 50 * scale, 60 * scale, 45 * scale)) {
+                settingsOpen = true; Inventory.movingSlot = -1; overlay.invalidate(); return true;
+            }
+
+            // ИНВЕНТАРЬ
             if (inventoryOpen || craftingOpen) {
                 if (bgBitmap == null) bgBitmap = android.graphics.BitmapFactory.decodeResource(getResources(), R.drawable.inventory_bg);
                 if (bgBitmap != null) {
@@ -230,7 +226,8 @@ public class MainActivity extends Activity {
                     int outX = left + (int)(bgW * 0.83f);
                     int outY = top + (int)(bgH * 0.15f);
 
-                    if (Math.pow(x - (left + bgW - 40), 2) + Math.pow(y - (top + 40), 2) < 2500) {
+                    // Кнопка закрытия (X)
+                    if (inCircle(x, y, left + bgW - 40, top + 40, 45 * scale)) {
                         inventoryOpen = false; craftingOpen = false; Inventory.movingSlot = -1; overlay.invalidate(); return true;
                     }
 
@@ -288,22 +285,23 @@ public class MainActivity extends Activity {
             }
             if (craftingOpen) return true;
 
-            if (inCircle(x, y, W - 320 * scale, 60 * scale, 45 * scale)) {
-                chatInput.setVisibility(View.VISIBLE); chatInput.requestFocus();
-                InputMethodManager imm = (InputMethodManager) getSystemService(Context.INPUT_METHOD_SERVICE);
-                imm.showSoftInput(chatInput, InputMethodManager.SHOW_IMPLICIT);
-                overlay.invalidate();
-                return true;
-            } else if (inCircle(x, y, W - 230 * scale, 60 * scale, 45 * scale)) {
-                renderer.player.thirdPerson = !renderer.player.thirdPerson;
-                overlay.invalidate();
-                return true;
-            } else if (inCircle(x, y, W - 140 * scale, 60 * scale, 45 * scale)) {
-                inventoryOpen = true; Inventory.movingSlot = -1; overlay.invalidate(); return true;
-            } else if (inCircle(x, y, W - 50 * scale, 60 * scale, 45 * scale)) {
-                settingsOpen = true; Inventory.movingSlot = -1; overlay.invalidate(); return true;
+            // НИЖНИЙ ХОТБАР
+            int hSlotSize = (int)(110 * scale);
+            int hGap = (int)(10 * scale);
+            int hStartX = (W - (9 * hSlotSize + 8 * hGap)) / 2;
+            int hStartY = (int)(H - 140 * scale);
+            if (y >= hStartY && y <= hStartY + hSlotSize) {
+                for (int i = 0; i < 9; i++) {
+                    int sx = hStartX + i * (hSlotSize + hGap);
+                    if (x >= sx && x <= sx + hSlotSize) {
+                        Inventory.selectedSlot = i;
+                        overlay.invalidate();
+                        return true;
+                    }
+                }
             }
 
+            // ДЖОЙСТИК И КНОПКИ УПРАВЛЕНИЯ
             boolean isJoySide = leftHanded ? (x > W / 2) : (x < W / 2);
             if (isJoySide && movePointerId == -1) { movePointerId = pId; knobX = x; knobY = y; }
             else if (inBtn(x, y, cx1, cy1, bSize) && bSwordId == -1) { bSwordId = pId; doAction(true); }
@@ -320,25 +318,6 @@ public class MainActivity extends Activity {
         else if (action == MotionEvent.ACTION_MOVE) {
             if (inventoryOpen && Inventory.movingSlot != -1) {
                 float x = event.getX(index), y = event.getY(index);
-            // Проверка нажатия на хотбар
-            if (!inventoryOpen && !settingsOpen && !craftingOpen) {
-                int hSlotSize = (int)(110 * scale);
-                int hGap = (int)(10 * scale);
-                int hStartX = (W - (9 * hSlotSize + 8 * hGap)) / 2;
-                int hStartY = (int)(H - 140 * scale);
-                
-                if (y >= hStartY && y <= hStartY + hSlotSize) {
-                    for (int i = 0; i < 9; i++) {
-                        int sx = hStartX + i * (hSlotSize + hGap);
-                        if (x >= sx && x <= sx + hSlotSize) {
-                            Inventory.selectedSlot = i;
-                            overlay.invalidate();
-                            return true;
-                        }
-                    }
-                }
-            }
-            
                 if (bgBitmap != null) {
                     float bgScale = Math.min((float) W / bgBitmap.getWidth(), (float) H / bgBitmap.getHeight()) * 0.9f;
                     int bgW = (int)(bgBitmap.getWidth() * bgScale);
